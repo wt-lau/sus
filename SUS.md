@@ -19,15 +19,11 @@ source-derived card with a subtle false spin.
 9. The selected card flips over in the UI to reveal whether it is truth or lie.
 10. If the selected card is the lie, the player wins the round.
 11. If the selected card is truthful, the card is cleared from the suspect pool.
-12. After clearing a truthful card, the player may ask one source-checking
-    question.
-13. The Sus Agent MCP server answers the question using Exa Answer or the best
-    available Exa-backed evidence for the topic.
-14. The player guesses again from the remaining uncleared cards.
-15. The clue-and-guess loop repeats until the lie is found.
-16. When the lie is found, the UI reveals the false spin and the round summary.
-17. The user returns to the welcome page and can start another round.
-18. The user may quit the game.
+12. The player guesses again from the remaining uncleared cards.
+13. The guess loop repeats until the lie is found.
+14. When the lie is found, the UI reveals the false spin and the round summary.
+15. The user returns to the welcome page and can start another round.
+16. The user may quit the game.
 
 ## Primary Screens
 
@@ -84,7 +80,7 @@ Truth card back:
 - Shows that the card is truthful.
 - Explains why the claim is supported.
 - Marks the card as cleared.
-- Prompts the user to ask one question before guessing again.
+- Keeps the remaining suspect cards available for the next guess.
 
 Lie card back:
 
@@ -93,13 +89,12 @@ Lie card back:
 - Shows what the original evidence supported.
 - Ends the round and opens the post-round summary.
 
-### Question Phase
+### Optional Clue Questions
 
-The question phase appears only after the player clears a truthful card.
-
-The user can ask one source-checking question before their next guess. The
-answer should help the player compare remaining cards without directly naming
-the lie unless the evidence makes the answer unavoidable.
+The main game loop should not force a search or question after a wrong guess.
+If the player explicitly asks for a clue, the answer should help compare
+remaining cards without directly naming the lie unless the evidence makes the
+answer unavoidable.
 
 Good question examples:
 
@@ -110,7 +105,7 @@ Good question examples:
 - What source detail should I verify before guessing?
 
 The answer should come from Exa Answer or Exa-backed evidence, then the user
-returns to the card board with the cleared card disabled.
+returns to the card board with cleared cards disabled.
 
 ### Round Summary
 
@@ -135,7 +130,7 @@ calls.
 Core session state:
 
 - Session id.
-- Current status: welcome, active, question, won, or quit.
+- Current status: welcome, active, won, or quit.
 - Current topic.
 - Five source cards.
 - Lie card id.
@@ -167,7 +162,7 @@ The server should:
 - Persist the round state.
 - Evaluate guesses.
 - Track cleared cards and remaining suspects.
-- Answer one question after each truthful guess.
+- Answer optional clue questions when explicitly requested.
 - Reveal the round once the lie is found.
 - Reset to the welcome page for another game.
 - Quit the session when requested.
@@ -178,9 +173,9 @@ The server should:
 - The board should make comparison easy: five cards, consistent fields, clear
   source signals.
 - The lie should be subtle, not silly.
-- Wrong guesses should feel useful because they unlock a question.
+- Wrong guesses should feel useful because they narrow the suspect pool.
 - The card flip should reveal the result without replacing the whole board.
 - Cleared cards should stay visible but disabled, so the player can compare
   what has already been ruled out.
-- The game should always offer a clear next action: ask a question, guess
-  again, play again, or quit.
+- The game should always offer a clear next action: guess again, play again, or
+  quit.

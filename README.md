@@ -26,17 +26,15 @@ agency explainers, research notes, reporting, policy briefs, or historical
 records. One of them has been poisoned by a tiny false spin.
 
 Pick the liar and the case closes. Pick a truthful card and it gets cleared from
-the suspect pool, but the game gives you one source-checking question before
-your next guess. That question is the clue phase: ask what wording to compare,
-which caveats matter, or where the claim overreaches. When the round ends, Sus
-reveals the exact false move so the player learns the pattern, not just the
-answer.
+the suspect pool, then keep comparing the remaining cards until the lie is found.
+When the round ends, Sus reveals the exact false move so the player learns the
+pattern, not just the answer.
 
 ## Why It Works as a Hackathon Game
 
 - The premise is instant: five credible cards, one is lying.
-- The interaction is visual: players select, clear, question, and reveal from a
-  source-card board.
+- The interaction is visual: players select, clear, and reveal from a source-card
+  board.
 - The game loop teaches a real skill: spotting exaggeration, absolute language,
   missing mechanisms, and fake certainty.
 - The demo can start safely with bundled starter packs, then become live and
@@ -61,19 +59,18 @@ The round engine supports three modes:
 - Starter round: omit the topic and Sus uses a bundled demo pack.
 - Custom round: pass exactly five source cards and Sus spins one into the lie.
 
-The active session keeps score, cleared cards, clue questions, and reveal state
-across MCP tool calls. Scoring now awards points for clean reads, streaks,
-comebacks, and no-clue solves while tracking round grades, rank progress, and
-earned badges.
+The active session keeps score, cleared cards, optional clue questions, and
+reveal state across MCP tool calls. Scoring now awards points for clean reads,
+streaks, comebacks, and no-clue solves while tracking round grades, rank
+progress, and earned badges.
 Each ChatGPT app user is routed to a user-scoped Durable Object when OAuth is
 configured, while completed round results are written to D1 for the shared
 leaderboard.
-When a player earns a question, `ask_question` uses Exa Answer when
+When a player explicitly asks for a clue, `ask_question` uses Exa Answer when
 `EXA_API_KEY` is configured and falls back to the source-card evidence if Exa is
 unavailable.
-Each active round can also generate one custom case image through Workers AI.
-The image prompt is derived from the round topic, current state, and optional
-visual direction from the widget, then returned as a session-scoped data URI.
+A separate MCP tool can still generate a custom case image through Workers AI,
+but the main widget stays focused on the source-card game loop.
 
 ## Local MCP
 
@@ -102,7 +99,7 @@ Connect the inspector to `http://localhost:8787/mcp`, then call:
 3. `start_game` to render the welcome UI
 4. Enter a topic in the widget, or call `start_round` with a topic
 5. `guess_sus_source`
-6. `ask_question` when a truthful card is cleared
+6. `ask_question` only if you want an optional clue
 7. `reveal_round` if you want to expose the answer
 
 ## Judge Demo Script
@@ -112,8 +109,8 @@ For a quick demo, start with the welcome flow:
 1. Call `start_game`.
 2. Use the widget topic input, or call `start_round` with `Ocean plastic`.
 3. Select the card that sounds too absolute.
-4. If the guess is wrong, ask: `What wording should I compare next?`
-5. Guess again, then reveal the round explanation.
+4. If the guess is wrong, keep selecting from the remaining cards.
+5. Reveal the round explanation after the case closes.
 
 For the live-search moment, start a new round with a topic such as `battery
 recycling`, `teen sleep`, or `volcanic eruptions`. Sus asks Exa for source-like
@@ -132,7 +129,7 @@ spin for the player to catch.
 - `generate_round_asset` - generates or regenerates a Workers AI image for the
   active round.
 - `guess_sus_source` - selects the card suspected of being the lie.
-- `ask_question` - asks one clue question after clearing a truthful card.
+- `ask_question` - asks an optional clue question about the remaining cards.
 - `reveal_round` - reveals the answer and every card explanation.
 - `get_leaderboard` - returns the D1-backed standings and the current player's
   rank.

@@ -28,6 +28,15 @@ export type SourceSeed = {
   url?: string;
 };
 
+export type SourceSpin = {
+  sourceIndex: number;
+  claim: string;
+  description: string;
+  headline?: string;
+  credibilitySignal?: string;
+  questionHints?: string[];
+};
+
 export type SourceCard = RawSourceCard & {
   id: CardId;
 };
@@ -904,10 +913,15 @@ export function normalizeCardId(value: string): CardId | undefined {
 export function createRound(
   topic?: string,
   sourceSeeds?: SourceSeed[],
-  sourceModeOverride?: "provided-sources" | "exa"
+  sourceModeOverride?: "provided-sources" | "exa",
+  sourceSpin?: SourceSpin
 ): Round {
   const requestedTopic = topic?.trim() || null;
-  const providedCards = createCardsFromSourceSeeds(requestedTopic, sourceSeeds);
+  const providedCards = createCardsFromSourceSeeds(
+    requestedTopic,
+    sourceSeeds,
+    sourceSpin
+  );
   const sourceMode = providedCards
     ? (sourceModeOverride ?? "provided-sources")
     : "starter-pack";
@@ -977,7 +991,7 @@ export function toPublicRound(round: Round, state: GameState) {
       imageUrl: assets.image?.url ?? null,
       clipUrl: null
     },
-    pendingQuestion: state.pendingQuestion,
+    pendingQuestion: false,
     cards: round.cards.map((card) => {
       const isRemaining = remainingIds.has(card.id);
       const status = isComplete
@@ -1313,7 +1327,8 @@ function findTopicPack(requestedTopic: string | null) {
 
 function createCardsFromSourceSeeds(
   requestedTopic: string | null,
-  sourceSeeds?: SourceSeed[]
+  sourceSeeds?: SourceSeed[],
+  sourceSpin?: SourceSpin
 ): RawSourceCard[] | null {
   const cleanedSeeds = sourceSeeds
     ?.map(cleanSourceSeed)
@@ -1323,11 +1338,18 @@ function createCardsFromSourceSeeds(
     return null;
   }
 
-  const lieIndex = Math.floor(Math.random() * cleanedSeeds.length);
+  const lieIndex =
+    sourceSpin && sourceSpin.sourceIndex >= 0
+      ? Math.min(sourceSpin.sourceIndex, cleanedSeeds.length - 1)
+      : Math.floor(Math.random() * cleanedSeeds.length);
 
   return cleanedSeeds.map((seed, index) => {
     if (index === lieIndex) {
-      return createSpunLie(seed, requestedTopic);
+      return createSpunLie(
+        seed,
+        requestedTopic,
+        sourceSpin?.sourceIndex === index ? sourceSpin : undefined
+      );
     }
 
     return {
@@ -1391,24 +1413,26 @@ function cleanSourceSeed(
 
 function createSpunLie(
   sourceSeed: SourceSeed,
-  requestedTopic: string | null
+  requestedTopic: string | null,
+  sourceSpin?: SourceSpin
 ): RawSourceCard {
-  const spin = applyMinorSpin(sourceSeed.claim);
+  const spin = sourceSpin ?? applyMinorSpin(sourceSeed.claim);
   const topicLabel = requestedTopic ?? "this topic";
 
   return {
     sourceName: sourceSeed.sourceName,
     sourceType: sourceSeed.sourceType,
-    headline: addSpinToHeadline(sourceSeed.headline),
+    headline: sourceSpin?.headline ?? addSpinToHeadline(sourceSeed.headline),
     claim: spin.claim,
     excerpt: `The source is framed as saying the finding applies without meaningful limits: ${sourceSeed.excerpt}`,
     published: sourceSeed.published ?? "Unknown date",
     credibilitySignal:
+      sourceSpin?.credibilitySignal ??
       "The source shape looks plausible, but the wording turns bounded evidence into an absolute claim.",
     url: sourceSeed.url,
     verdict: "lie",
     explanation: `This is the lie: Sus ${spin.description} in a card derived from ${sourceSeed.sourceName}, overstating what the source supports about ${topicLabel}. The original claim was: "${truncateText(sourceSeed.claim, 220)}"`,
-    questionHints: [
+    questionHints: sourceSpin?.questionHints ?? [
       "The suspicious move is the jump from bounded evidence to absolute language.",
       "Compare the card's certainty against the source-style caveats in the other cards."
     ]

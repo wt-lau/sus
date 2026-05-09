@@ -1,4 +1,4 @@
-export const SUS_WIDGET_URI = "ui://widget/sus-source-cards-v6.html";
+export const SUS_WIDGET_URI = "ui://widget/sus-source-cards-v8.html";
 export const SUS_WIDGET_MIME_TYPE = "text/html;profile=mcp-app";
 
 export const SUS_WIDGET_HTML = `<!doctype html>
@@ -259,6 +259,19 @@ export const SUS_WIDGET_HTML = `<!doctype html>
         display: flex;
         align-items: center;
         gap: 12px;
+      }
+
+      .welcome-user {
+        color: var(--accent);
+        font-size: 13px;
+        font-weight: 600;
+        line-height: 1.4;
+        margin-bottom: 10px;
+        overflow-wrap: anywhere;
+      }
+
+      .welcome-user span {
+        color: var(--ink-primary);
       }
 
       .brand-mark {
@@ -1176,70 +1189,6 @@ export const SUS_WIDGET_HTML = `<!doctype html>
         font-size: 14px;
       }
 
-      /* Asset panel */
-      .asset-panel {
-        background: var(--surface-subtle);
-        border: 1px dashed var(--border-soft);
-        border-radius: var(--radius-md);
-        padding: 14px;
-        display: grid;
-        grid-template-columns: 88px minmax(0, 1fr);
-        gap: 14px;
-        align-items: start;
-      }
-
-      .asset-image {
-        width: 88px;
-        height: 88px;
-        border-radius: var(--radius-sm);
-        background: var(--surface-card);
-        border: 1px solid var(--border-soft);
-        object-fit: cover;
-      }
-
-      .asset-image.placeholder {
-        background: linear-gradient(
-          135deg,
-          var(--accent-soft),
-          var(--surface-card) 70%
-        );
-      }
-
-      .asset-content {
-        display: grid;
-        gap: 8px;
-        min-width: 0;
-      }
-
-      .asset-prompt-text {
-        color: var(--ink-secondary);
-        font-size: 13px;
-        line-height: 1.5;
-      }
-
-      .asset-form {
-        display: grid;
-        grid-template-columns: minmax(0, 1fr) auto;
-        gap: 6px;
-        margin-top: 2px;
-      }
-
-      .asset-form input {
-        font-size: 13px;
-        padding: 9px 12px;
-      }
-
-      .asset-form button {
-        padding: 9px 14px;
-        font-size: 13px;
-      }
-
-      .asset-meta {
-        color: var(--ink-tertiary);
-        font-size: 11px;
-        font-feature-settings: "tnum";
-      }
-
       /* Summary */
       .summary {
         display: grid;
@@ -1450,19 +1399,6 @@ export const SUS_WIDGET_HTML = `<!doctype html>
           flex-basis: min(86vw, 360px);
         }
 
-        .asset-panel {
-          grid-template-columns: 1fr;
-        }
-
-        .asset-image {
-          width: 100%;
-          height: 140px;
-        }
-
-        .asset-form {
-          grid-template-columns: 1fr;
-        }
-
         .panel-header {
           flex-wrap: wrap;
         }
@@ -1497,8 +1433,6 @@ export const SUS_WIDGET_HTML = `<!doctype html>
       const state = {
         game: window.openai && window.openai.toolOutput ? window.openai.toolOutput : null,
         topic: savedUiState.topic || "",
-        question: savedUiState.question || "",
-        assetPrompt: savedUiState.assetPrompt || "",
         flippingCardId: "",
         busy: "",
         error: ""
@@ -1619,9 +1553,7 @@ export const SUS_WIDGET_HTML = `<!doctype html>
         }
         window.openai.setWidgetState({
           privateContent: {
-            topic: state.topic,
-            question: state.question,
-            assetPrompt: state.assetPrompt
+            topic: state.topic
           }
         });
       }
@@ -1633,6 +1565,17 @@ export const SUS_WIDGET_HTML = `<!doctype html>
           .map((item) => (item && item.topic ? item.topic : item))
           .filter(Boolean)
           .slice(0, 5);
+      }
+
+      function getWelcomeName(game) {
+        const player = game && game.player;
+        const displayName =
+          player && typeof player.displayName === "string"
+            ? player.displayName.trim()
+            : "";
+
+        if (!displayName || player.source === "session") return "";
+        return displayName;
       }
 
       function cardStateLabel(status) {
@@ -1649,7 +1592,7 @@ export const SUS_WIDGET_HTML = `<!doctype html>
       // focus + cursor position after innerHTML replace. Without this, any
       // re-render while the user is typing destroys their input element
       // and they lose focus mid-keystroke.
-      const FOCUS_INPUT_KEYS = ["data-topic", "data-question", "data-asset-prompt"];
+      const FOCUS_INPUT_KEYS = ["data-topic"];
       function captureFocus() {
         const active = document.activeElement;
         if (!active || active.tagName !== "INPUT") return null;
@@ -1722,7 +1665,6 @@ export const SUS_WIDGET_HTML = `<!doctype html>
         }
 
         const cards = Array.isArray(round.cards) ? round.cards : [];
-        const pendingQuestion = Boolean(round.pendingQuestion);
         const isComplete = status === "won" || status === "revealed";
         const remainingCount = cards.filter(
           (card) => card.status === "remaining"
@@ -1730,16 +1672,14 @@ export const SUS_WIDGET_HTML = `<!doctype html>
 
         root.innerHTML = [
           '<main class="shell">',
-          renderRoundHeader(game, round, status, pendingQuestion, isComplete),
-          renderRoundMeta(game, pendingQuestion, isComplete, remainingCount),
+          renderRoundHeader(game, round, status, isComplete),
+          renderRoundMeta(game, isComplete, remainingCount),
           renderScorePanel(game.score, false),
           state.error
             ? '<div class="error" role="alert">' + html(state.error) + "</div>"
             : "",
-          renderCards(cards, pendingQuestion, isComplete),
-          pendingQuestion && !isComplete ? renderQuestion() : "",
+          renderCards(cards, isComplete),
           game.answer ? renderAnswer(game.answer) : "",
-          renderAssetPanel(round),
           reveal && isComplete ? renderSummary(game, reveal, status) : "",
           "</main>"
         ].join("");
@@ -1751,6 +1691,7 @@ export const SUS_WIDGET_HTML = `<!doctype html>
 
       function renderWelcome(game, status) {
         const suggestions = getSuggestions(game);
+        const welcomeName = getWelcomeName(game);
         const showError = state.error || status === "exa-search-failed";
         const errorText =
           state.error ||
@@ -1764,6 +1705,11 @@ export const SUS_WIDGET_HTML = `<!doctype html>
           "</header>",
 
           '<div class="welcome-hero">',
+          welcomeName
+            ? '<p class="welcome-user">Welcome, <span>' +
+              html(welcomeName) +
+              "</span></p>"
+            : "",
           "<h1>Four sources are careful.<br />One is <em>bending the truth</em>.</h1>",
           '<p class="lede">Pick any topic. Sus deals five plausible source cards — four stay precise; one quietly turns a caveat into certainty. Read closely, then accuse.</p>',
           "</div>",
@@ -1816,7 +1762,7 @@ export const SUS_WIDGET_HTML = `<!doctype html>
           ),
           renderStep(
             "Accuse.",
-            "One card hides the spin. Wrong guesses clear truth and unlock one clue question."
+            "One card hides the spin. Wrong guesses clear truth, then you keep comparing."
           ),
           renderStep(
             "Reveal.",
@@ -1877,13 +1823,11 @@ export const SUS_WIDGET_HTML = `<!doctype html>
         );
       }
 
-      function renderRoundHeader(game, round, status, pendingQuestion, isComplete) {
+      function renderRoundHeader(game, round, status, isComplete) {
         const guidance = isComplete
           ? "Case closed. Read each verdict to spot the pattern."
-          : pendingQuestion
-            ? "You earned a clue. Ask one source-checking question before guessing again."
-            : game.message ||
-              "Compare every card by caveats, scope, mechanism, and certainty.";
+          : game.message ||
+            "Compare every card by caveats, scope, mechanism, and certainty.";
 
         return [
           '<header class="round-header">',
@@ -1908,13 +1852,11 @@ export const SUS_WIDGET_HTML = `<!doctype html>
         ].join("");
       }
 
-      function renderRoundMeta(game, pendingQuestion, isComplete, remainingCount) {
+      function renderRoundMeta(game, isComplete, remainingCount) {
         const score = game.score || {};
         const phase = isComplete
           ? "Case closed"
-          : pendingQuestion
-            ? "Clue unlocked"
-            : "Compare & accuse";
+          : "Compare & accuse";
 
         return [
           '<div class="round-meta">',
@@ -2002,7 +1944,7 @@ export const SUS_WIDGET_HTML = `<!doctype html>
         );
       }
 
-      function renderCards(cards, pendingQuestion, isComplete) {
+      function renderCards(cards, isComplete) {
         return [
           '<section class="card-carousel" aria-label="Source cards">',
           '<div class="carousel-toolbar">',
@@ -2017,7 +1959,6 @@ export const SUS_WIDGET_HTML = `<!doctype html>
               const selectable =
                 !state.busy &&
                 card.status === "remaining" &&
-                !pendingQuestion &&
                 !isComplete;
               const isFlipped =
                 state.flippingCardId === card.id || card.status !== "remaining";
@@ -2172,52 +2113,6 @@ export const SUS_WIDGET_HTML = `<!doctype html>
         );
       }
 
-      function renderQuestion() {
-        return [
-          '<section class="panel accent">',
-          '<header class="panel-header">',
-          '<h2 class="panel-title">One clue earned</h2>',
-          '<span class="panel-pill">Ask before next guess</span>',
-          "</header>",
-          '<p class="panel-body">You cleared a careful card. Use one source-checking question before accusing again.</p>',
-          '<div class="form-row">',
-          '<input data-question value="' +
-            html(state.question) +
-            '" placeholder="What wording should I compare next?" aria-label="Question" />',
-          '<button data-action="ask" type="button"' +
-            (state.busy ? " disabled" : "") +
-            ">",
-          html(state.busy || "Ask"),
-          "</button>",
-          "</div>",
-          '<div class="clue-presets" aria-label="Suggested clue questions">',
-          renderQuestionPreset(
-            "What wording should I compare next?",
-            "Compare wording"
-          ),
-          renderQuestionPreset(
-            "Which remaining card overclaims causation?",
-            "Overclaimed causation"
-          ),
-          renderQuestionPreset(
-            "Which caveat matters most here?",
-            "Critical caveat"
-          ),
-          "</div>",
-          "</section>"
-        ].join("");
-      }
-
-      function renderQuestionPreset(value, label) {
-        return (
-          '<button class="btn-pill" data-action="preset-question" data-question-value="' +
-          html(value) +
-          '" type="button">' +
-          html(label) +
-          "</button>"
-        );
-      }
-
       function renderAnswer(answer) {
         const clues = Array.isArray(answer.clues) ? answer.clues : [];
         const citations = Array.isArray(answer.citations) ? answer.citations : [];
@@ -2267,60 +2162,6 @@ export const SUS_WIDGET_HTML = `<!doctype html>
                 "</div>"
             : "",
           "</section>"
-        ].join("");
-      }
-
-      function renderAssetPanel(round) {
-        const assets = round.assets || {};
-        const image = assets.image || null;
-        const hasImage = Boolean(image && image.url);
-        const prompt =
-          hasImage && image.prompt
-            ? image.prompt
-            : (round.futureAssets && round.futureAssets.artPrompt) || "";
-        const buttonLabel =
-          state.busy === "Generating art"
-            ? "Generating…"
-            : hasImage
-              ? "Regenerate"
-              : "Generate art";
-
-        return [
-          '<aside class="asset-panel">',
-          hasImage
-            ? '<img class="asset-image" src="' +
-              html(image.url) +
-              '" alt="Generated art for ' +
-              html(round.topic) +
-              '" />'
-            : '<div class="asset-image placeholder" role="img" aria-label="No image yet"></div>',
-          '<div class="asset-content">',
-          '<p class="kicker">Optional case visual</p>',
-          prompt
-            ? '<p class="asset-prompt-text">' + html(prompt) + "</p>"
-            : "",
-          hasImage && image.model
-            ? '<p class="asset-meta">' +
-              html(image.model + " · seed " + image.seed) +
-              "</p>"
-            : "",
-          assets.imageError
-            ? '<div class="error" role="alert">' +
-              html(assets.imageError) +
-              "</div>"
-            : "",
-          '<div class="asset-form">',
-          '<input data-asset-prompt value="' +
-            html(state.assetPrompt) +
-            '" placeholder="Optional visual direction" aria-label="Visual direction" />',
-          '<button class="btn-secondary" data-action="generate-asset" type="button"' +
-            (state.busy ? " disabled" : "") +
-            ">" +
-            html(buttonLabel) +
-            "</button>",
-          "</div>",
-          "</div>",
-          "</aside>"
         ].join("");
       }
 
@@ -2456,24 +2297,6 @@ export const SUS_WIDGET_HTML = `<!doctype html>
           });
         }
 
-        const questionInput = root.querySelector("[data-question]");
-        if (questionInput) {
-          questionInput.addEventListener("input", (event) => {
-            state.question = event.target.value;
-          });
-          questionInput.addEventListener("change", persistUiState);
-          questionInput.addEventListener("blur", persistUiState);
-        }
-
-        const assetPromptInput = root.querySelector("[data-asset-prompt]");
-        if (assetPromptInput) {
-          assetPromptInput.addEventListener("input", (event) => {
-            state.assetPrompt = event.target.value;
-          });
-          assetPromptInput.addEventListener("change", persistUiState);
-          assetPromptInput.addEventListener("blur", persistUiState);
-        }
-
         const cardCarousel = root.querySelector("[data-card-carousel]");
         if (cardCarousel) {
           cardCarousel.addEventListener("keydown", (event) => {
@@ -2523,21 +2346,6 @@ export const SUS_WIDGET_HTML = `<!doctype html>
               await openSource(element.getAttribute("data-url"));
               return;
             }
-            if (action === "generate-asset") {
-              const round = state.game && state.game.round;
-              const hasImage = Boolean(
-                round && round.assets && round.assets.image
-              );
-              persistUiState();
-              await runTool(
-                "generate_round_asset",
-                {
-                  prompt: state.assetPrompt.trim() || undefined,
-                  force: hasImage
-                },
-                "Generating art"
-              );
-            }
             if (action === "guess") {
               state.flippingCardId = element.getAttribute("data-card-id") || "";
               await runTool(
@@ -2545,27 +2353,6 @@ export const SUS_WIDGET_HTML = `<!doctype html>
                 { cardId: element.getAttribute("data-card-id") },
                 "Checking"
               );
-            }
-            if (action === "ask") {
-              const question = state.question.trim();
-              if (question.length < 3) {
-                state.error = "Ask a source-checking question first.";
-                render();
-                return;
-              }
-              await runTool("ask_question", { question }, "Answering");
-              state.question = "";
-              persistUiState();
-              render();
-            }
-            if (action === "preset-question") {
-              const question = element.getAttribute("data-question-value") || "";
-              state.question = question;
-              persistUiState();
-              await runTool("ask_question", { question }, "Answering");
-              state.question = "";
-              persistUiState();
-              render();
             }
             if (action === "close") {
               if (window.openai && typeof window.openai.requestClose === "function") {

@@ -31,7 +31,9 @@ import {
   type CardId,
   type GeneratedImageAsset,
   type GameState,
-  type Round
+  type Round,
+  type SourceSeed,
+  type SourceSpin
 } from "./game";
 import {
   SUS_WIDGET_HTML,
@@ -62,6 +64,8 @@ const MCP_PATH = "/mcp";
 const MCP_TRANSPORT_STATE_KEY = "mcp-transport-state";
 const PLAYER_IDENTITY_STATE_KEY = "player-identity";
 const WORKERS_AI_IMAGE_MODEL = "@cf/black-forest-labs/flux-1-schnell";
+const WORKERS_AI_SPIN_MODEL = "openai/gpt-5.5";
+const WORKERS_AI_GATEWAY_ID = "default";
 const susWidgetResourceMeta = {
   ui: {
     prefersBorder: true,
@@ -74,7 +78,7 @@ const susWidgetResourceMeta = {
     }
   },
   "openai/widgetDescription":
-    "Interactive Sus game board for choosing a topic, comparing five source cards, accusing the false spin, asking earned clue questions, and reviewing the reveal.",
+    "Interactive Sus game board for choosing a topic, comparing five source cards, accusing the false spin, and reviewing the reveal.",
   "openai/widgetPrefersBorder": true,
   "openai/widgetCSP": {
     connect_domains: [],
@@ -102,6 +106,19 @@ const sourcesInputSchema = z
   .describe(
     "Exactly five source cards gathered for the topic. Sus will keep four truthful and add a minor false spin to one."
   );
+const sourceSpinOutputSchema = z
+  .object({
+    spunClaim: z.string().trim().min(20).max(420),
+    spinDescription: z.string().trim().min(8).max(220),
+    headline: z.string().trim().min(1).max(180).optional(),
+    credibilitySignal: z.string().trim().min(20).max(280).optional(),
+    questionHints: z
+      .array(z.string().trim().min(8).max(160))
+      .min(1)
+      .max(2)
+      .optional()
+  })
+  .strict();
 
 function jsonResponse(value: Record<string, unknown>, text?: string) {
   return {
@@ -154,10 +171,33 @@ function noRoundResponse() {
   });
 }
 
-function welcomeResponse(state: GameState, prefillTopic?: string) {
+function publicPlayerProfile(player?: PlayerIdentity | null) {
+  if (!player) return null;
+
+  return {
+    displayName: player.displayName,
+    source: player.source,
+    signedIn: player.source === "oauth"
+  };
+}
+
+function welcomeResponse(
+  state: GameState,
+  prefillTopic?: string,
+  player?: PlayerIdentity | null
+) {
+  const playerProfile = publicPlayerProfile(player);
+  const welcomeName =
+    playerProfile && playerProfile.source !== "session"
+      ? playerProfile.displayName
+      : "";
+
   return jsonResponse({
     status: "welcome",
-    message: "Sus is ready. Enter a topic to open a new case file.",
+    message: welcomeName
+      ? `Welcome, ${welcomeName}. Enter a topic to open a new case file.`
+      : "Sus is ready. Enter a topic to open a new case file.",
+    player: playerProfile,
     session: state.session,
     score: state.score,
     prefillTopic: prefillTopic?.trim() || "",
@@ -214,8 +254,14 @@ async function prepareRound(
   env: Env
 ): Promise<RoundPreparation> {
   if (sources) {
+    const sourceSpin = await generateSourceSpinWithAi(
+      topic?.trim() || null,
+      sources,
+      env
+    );
+
     return {
-      round: createRound(topic, sources),
+      round: createRound(topic, sources, undefined, sourceSpin),
       sourceSearch: { mode: "provided-sources" }
     };
   }
@@ -236,9 +282,14 @@ async function prepareRound(
   }
 
   const sourceSearch = await searchTopicSourcesWithExa(requestedTopic, apiKey);
+  const sourceSpin = await generateSourceSpinWithAi(
+    requestedTopic,
+    sourceSearch.sources,
+    env
+  );
 
   return {
-    round: createRound(requestedTopic, sourceSearch.sources, "exa"),
+    round: createRound(requestedTopic, sourceSearch.sources, "exa", sourceSpin),
     sourceSearch: exaSearchMeta(sourceSearch)
   };
 }
@@ -249,6 +300,144 @@ function exaSearchMeta(sourceSearch: ExaSourceSearch) {
     requestId: sourceSearch.requestId,
     query: sourceSearch.query
   };
+}
+
+type WorkersAiChatResponse = {
+  choices?: Array<{
+    message?: {
+      content?: string | null;
+    };
+  }>;
+  response?: string;
+};
+
+async function generateSourceSpinWithAi(
+  topic: string | null,
+  sources: SourceSeed[],
+  env: Env
+): Promise<SourceSpin | undefined> {
+  if (sources.length !== 5) return undefined;
+
+  const sourceIndex = Math.floor(Math.random() * sources.length);
+  const source = sources[sourceIndex];
+  if (!source) return undefined;
+
+  try {
+    const response = (await env.AI.run(
+      WORKERS_AI_SPIN_MODEL,
+      {
+        messages: buildSpinMessages(topic, source, sources),
+        response_format: { type: "json_object" },
+        max_completion_tokens: 420,
+        temperature: 0.45
+      },
+      {
+        gateway: { id: WORKERS_AI_GATEWAY_ID }
+      }
+    )) as WorkersAiChatResponse;
+    const content = extractAiMessageContent(response);
+    if (!content) return undefined;
+
+    const parsed = sourceSpinOutputSchema.safeParse(
+      parseJsonFromModelContent(content)
+    );
+    if (!parsed.success) return undefined;
+
+    const sourceSpin: SourceSpin = {
+      sourceIndex,
+      claim: parsed.data.spunClaim,
+      description: parsed.data.spinDescription,
+      headline: parsed.data.headline,
+      credibilitySignal: parsed.data.credibilitySignal,
+      questionHints: parsed.data.questionHints
+    };
+
+    return isUsefulGeneratedSpin(source.claim, sourceSpin.claim)
+      ? sourceSpin
+      : undefined;
+  } catch (error) {
+    console.warn(
+      "Workers AI spin generation failed; falling back to local spin.",
+      error instanceof Error ? error.message : String(error)
+    );
+    return undefined;
+  }
+}
+
+function buildSpinMessages(
+  topic: string | null,
+  source: SourceSeed,
+  sources: SourceSeed[]
+) {
+  return [
+    {
+      role: "system" as const,
+      content: [
+        "You write one subtle false spin for Sus, a source-checking game.",
+        "Keep the card plausible and close to the original source.",
+        "Do not invent new names, dates, places, studies, figures, or mechanisms.",
+        "The spin should make a bounded source claim false by changing scope, certainty, causality, or caveats.",
+        "Return only a JSON object with spunClaim, spinDescription, headline, credibilitySignal, and questionHints."
+      ].join(" ")
+    },
+    {
+      role: "user" as const,
+      content: JSON.stringify({
+        topic: topic ?? "Custom source pack",
+        chosenSource: source,
+        otherClaims: sources
+          .filter((candidate) => candidate !== source)
+          .map((candidate) => ({
+            sourceName: candidate.sourceName,
+            claim: candidate.claim
+          })),
+        requirements: {
+          spunClaim:
+            "A revised version of chosenSource.claim that is subtly false but still source-shaped.",
+          spinDescription:
+            "Short explanation of the exact wording move, for example changed a caveated association into a causal guarantee.",
+          headline:
+            "Optional revised headline aligned with the spun claim. Omit if the original headline still fits.",
+          credibilitySignal:
+            "One sentence explaining why this looks credible but overreaches.",
+          questionHints:
+            "One or two short clue hints that do not directly name the lie."
+        }
+      })
+    }
+  ];
+}
+
+function extractAiMessageContent(response: WorkersAiChatResponse) {
+  return response.choices?.[0]?.message?.content ?? response.response ?? null;
+}
+
+function parseJsonFromModelContent(content: string) {
+  const normalized = content
+    .trim()
+    .replace(/^```(?:json)?\s*/i, "")
+    .replace(/\s*```$/i, "")
+    .trim();
+
+  try {
+    return JSON.parse(normalized) as unknown;
+  } catch {
+    const start = normalized.indexOf("{");
+    const end = normalized.lastIndexOf("}");
+    if (start === -1 || end <= start) throw new Error("No JSON object found.");
+    return JSON.parse(normalized.slice(start, end + 1)) as unknown;
+  }
+}
+
+function isUsefulGeneratedSpin(originalClaim: string, spunClaim: string) {
+  const normalize = (value: string) =>
+    value
+      .toLowerCase()
+      .replace(/\s+/g, " ")
+      .replace(/[.!?]+$/, "")
+      .trim();
+
+  return normalize(originalClaim) !== normalize(spunClaim);
 }
 
 function exaErrorResponse(error: unknown, topic?: string) {
@@ -553,8 +742,8 @@ export class SusGameMcp extends Agent<Env, GameState> {
             "Choose a topic from the welcome screen, then start_round deals five source cards.",
             "Four cards are truthful. One card is the lie.",
             "Guess the lie with guess_sus_source.",
-            "If you pick a truthful card, that card is cleared and you must ask one question before guessing again.",
-            "Use ask_question to get source-quality clues about the remaining cards.",
+            "If you pick a truthful card, that card is cleared and you can keep guessing.",
+            "Use ask_question only when you want an optional source-quality clue.",
             "Use start_round for another round inside the same session."
           ],
           starterNote:
@@ -629,9 +818,9 @@ export class SusGameMcp extends Agent<Env, GameState> {
             session: this.state.session,
             round: toPublicRound(this.state.round, this.state),
             score: this.state.score,
-            nextActions: this.state.pendingQuestion
-              ? ["Call ask_question before guessing again."]
-              : ["Call guess_sus_source with the card ID you think is lying."]
+            nextActions: [
+              "Call guess_sus_source with the card ID you think is lying."
+            ]
           });
         }
 
@@ -649,7 +838,11 @@ export class SusGameMcp extends Agent<Env, GameState> {
 
         this.setState(nextState);
 
-        return welcomeResponse(nextState, topic);
+        return welcomeResponse(
+          nextState,
+          topic,
+          await this.getPlayerIdentity()
+        );
       }
     );
 
@@ -672,7 +865,11 @@ export class SusGameMcp extends Agent<Env, GameState> {
       async () => {
         if (!this.state.round) {
           if (this.state.session && this.state.status === "welcome") {
-            return welcomeResponse(this.state);
+            return welcomeResponse(
+              this.state,
+              undefined,
+              await this.getPlayerIdentity()
+            );
           }
 
           return jsonResponse({
@@ -692,9 +889,7 @@ export class SusGameMcp extends Agent<Env, GameState> {
           guesses: this.state.guesses,
           questions: this.state.questions,
           score: this.state.score,
-          nextActions: this.state.pendingQuestion
-            ? ["Ask one question from the widget before guessing again."]
-            : ["Select the card you think is lying."]
+          nextActions: ["Select the card you think is lying."]
         });
       }
     );
@@ -857,8 +1052,7 @@ export class SusGameMcp extends Agent<Env, GameState> {
       "get_round",
       {
         title: "Get current round",
-        description:
-          "Show the active round, remaining cards, guesses, and whether a question is required.",
+        description: "Show the active round, remaining cards, and guesses.",
         inputSchema: {},
         outputSchema: gameViewOutputSchema,
         annotations: {
@@ -879,9 +1073,7 @@ export class SusGameMcp extends Agent<Env, GameState> {
           guesses: this.state.guesses,
           questions: this.state.questions,
           score: this.state.score,
-          nextActions: this.state.pendingQuestion
-            ? ["Call ask_question before guessing again."]
-            : ["Call guess_sus_source when you are ready."]
+          nextActions: ["Call guess_sus_source when you are ready."]
         });
       }
     );
@@ -891,7 +1083,7 @@ export class SusGameMcp extends Agent<Env, GameState> {
       {
         title: "Guess the lie",
         description:
-          "Use this when the user selects a source card. If the card is truthful, clear it and require one question before another guess.",
+          "Use this when the user selects a source card. If the card is truthful, clear it and let the user keep guessing.",
         inputSchema: {
           cardId: z
             .string()
@@ -919,17 +1111,6 @@ export class SusGameMcp extends Agent<Env, GameState> {
             round: toPublicRound(round, this.state),
             reveal: revealRound(round, this.state),
             score: normalizeScore(this.state.score)
-          });
-        }
-
-        if (this.state.pendingQuestion) {
-          return jsonResponse({
-            status: "question-required",
-            message:
-              "You cleared a truthful source on the previous guess. Ask one question before guessing again.",
-            round: toPublicRound(round, this.state),
-            score: normalizeScore(this.state.score),
-            nextActions: ["ask_question"]
           });
         }
 
@@ -1018,7 +1199,7 @@ export class SusGameMcp extends Agent<Env, GameState> {
           status: solvedByElimination ? "won" : "active",
           eliminatedIds,
           guesses: [...this.state.guesses, guess],
-          pendingQuestion: solvedByElimination ? false : true,
+          pendingQuestion: false,
           score
         };
         this.setState(nextState);
@@ -1052,7 +1233,7 @@ export class SusGameMcp extends Agent<Env, GameState> {
           session: nextState.session,
           round: toPublicRound(round, nextState),
           score: nextState.score,
-          nextActions: ["Call ask_question before guessing again."]
+          nextActions: ["Call guess_sus_source with your next suspect."]
         });
       }
     );
@@ -1060,9 +1241,9 @@ export class SusGameMcp extends Agent<Env, GameState> {
     this.server.registerTool(
       "ask_question",
       {
-        title: "Ask a source-checking question",
+        title: "Ask an optional source-checking question",
         description:
-          "Ask one question after clearing a truthful card. The answer gives clues about the remaining cards.",
+          "Ask an optional question for clues about the remaining cards.",
         inputSchema: {
           question: z
             .string()
@@ -1090,17 +1271,6 @@ export class SusGameMcp extends Agent<Env, GameState> {
             round: toPublicRound(round, this.state),
             reveal: revealRound(round, this.state),
             score: normalizeScore(this.state.score)
-          });
-        }
-
-        if (!this.state.pendingQuestion) {
-          return jsonResponse({
-            status: "no-question-earned",
-            message:
-              "Questions unlock only after you guess a truthful source. Make a guess first.",
-            round: toPublicRound(round, this.state),
-            score: normalizeScore(this.state.score),
-            nextActions: ["guess_sus_source"]
           });
         }
 
@@ -1293,6 +1463,7 @@ export class SusGameMcp extends Agent<Env, GameState> {
             : "Sus has been reset.",
           session: nextState.session,
           score: nextState.score,
+          player: publicPlayerProfile(await this.getPlayerIdentity()),
           suggestedTopics: listTopics(),
           nextActions: nextState.session
             ? ["Enter a topic in the widget.", "Or call start_round."]
