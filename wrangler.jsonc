@@ -25,6 +25,13 @@
     "binding": "AI",
     "remote": true
   },
+  "d1_databases": [
+    {
+      "binding": "SUS_DB",
+      "database_name": "sus",
+      "migrations_dir": "migrations"
+    }
+  ],
   "migrations": [
     {
       "new_sqlite_classes": ["SusGameMcp"],
@@ -33,6 +40,14 @@
   ],
   "observability": {
     "enabled": true
+  },
+  "vars": {
+    "SUS_AUTH_AUDIENCE": "",
+    "SUS_AUTH_ISSUER": "",
+    "SUS_AUTH_JWKS_URL": "",
+    "SUS_AUTH_REQUIRED": "false",
+    "SUS_AUTH_RESOURCE": "",
+    "SUS_AUTH_SCOPE": "sus.play"
   },
   "secrets": {
     "required": ["EXA_API_KEY"]

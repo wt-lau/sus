@@ -65,6 +65,9 @@ The active session keeps score, cleared cards, clue questions, and reveal state
 across MCP tool calls. Scoring now awards points for clean reads, streaks,
 comebacks, and no-clue solves while tracking round grades, rank progress, and
 earned badges.
+Each ChatGPT app user is routed to a user-scoped Durable Object when OAuth is
+configured, while completed round results are written to D1 for the shared
+leaderboard.
 When a player earns a question, `ask_question` uses Exa Answer when
 `EXA_API_KEY` is configured and falls back to the source-card evidence if Exa is
 unavailable.
@@ -131,6 +134,8 @@ spin for the player to catch.
 - `guess_sus_source` - selects the card suspected of being the lie.
 - `ask_question` - asks one clue question after clearing a truthful card.
 - `reveal_round` - reveals the answer and every card explanation.
+- `get_leaderboard` - returns the D1-backed standings and the current player's
+  rank.
 - `reset_game` - clears the active round and optionally the score.
 
 ## Source Input Shape
@@ -171,6 +176,47 @@ Set the deployed Worker secret with Wrangler:
 npx wrangler secret put EXA_API_KEY
 ```
 
+## Player Identity and Leaderboard
+
+Sus uses two storage layers:
+
+- Durable Objects keep the live MCP transport and active game state scoped to
+  one resolved player.
+- D1 stores completed round results and aggregate leaderboard rows across
+  players.
+
+For local development, Sus falls back to `?user=...`, `x-sus-user-id`, or the
+MCP session ID. For the ChatGPT app, configure OAuth so ChatGPT sends
+`Authorization: Bearer <token>` to `/mcp`; the Worker verifies the token with
+JWKS and derives a stable hashed player ID from `iss + sub`.
+
+Configure these environment variables in `wrangler.jsonc` or the Cloudflare
+dashboard:
+
+```text
+SUS_AUTH_ISSUER=https://your-auth-server.example.com
+SUS_AUTH_AUDIENCE=https://your-sus-worker.example.com
+SUS_AUTH_JWKS_URL=https://your-auth-server.example.com/.well-known/jwks.json
+SUS_AUTH_RESOURCE=https://your-sus-worker.example.com
+SUS_AUTH_SCOPE=sus.play
+SUS_AUTH_REQUIRED=true
+```
+
+The Worker exposes OAuth protected resource metadata at:
+
+```text
+/.well-known/oauth-protected-resource
+```
+
+Create the D1 database, update `wrangler.jsonc` with the generated
+`database_id` if needed for deploys, then apply migrations:
+
+```bash
+npx wrangler d1 create sus
+npx wrangler d1 migrations apply sus --local
+npx wrangler d1 migrations apply sus --remote
+```
+
 ## Workers AI Assets
 
 The Worker has an `AI` binding in `wrangler.jsonc`. `generate_round_asset`
@@ -181,5 +227,3 @@ the latest generated data URI in the `McpAgent` state for the current session.
 
 - Cloudflare R2 storage for generated round assets.
 - Clip generation from the selected topic.
-- Durable player profiles or leaderboards if the score should survive beyond an
-  MCP session.

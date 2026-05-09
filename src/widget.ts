@@ -376,6 +376,124 @@ export const SUS_WIDGET_HTML = `<!doctype html>
         line-height: 1.55;
       }
 
+      /* Case loader */
+      .case-loader {
+        min-height: 520px;
+        display: grid;
+        align-content: center;
+        gap: 28px;
+      }
+
+      .case-loader-header {
+        display: grid;
+        gap: 16px;
+        max-width: 620px;
+      }
+
+      .case-loader-title {
+        font-family: var(--font-display);
+        font-size: clamp(34px, 6vw, 54px);
+        font-weight: 500;
+        line-height: 1.04;
+        letter-spacing: -0.022em;
+        text-wrap: balance;
+      }
+
+      .case-loader-topic {
+        color: var(--accent);
+        font-style: italic;
+      }
+
+      .case-loader-copy {
+        color: var(--ink-secondary);
+        font-size: 16px;
+        line-height: 1.6;
+        max-width: 540px;
+      }
+
+      .case-loader-track {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 12px;
+      }
+
+      .loader-card {
+        background: var(--surface-card);
+        border: 1px solid var(--border-soft);
+        border-radius: var(--radius-md);
+        min-height: 170px;
+        padding: 18px;
+        display: grid;
+        grid-template-rows: auto 1fr auto;
+        gap: 18px;
+        overflow: hidden;
+        position: relative;
+      }
+
+      .loader-card::after {
+        content: "";
+        position: absolute;
+        inset: 0;
+        transform: translateX(-120%);
+        background: linear-gradient(
+          90deg,
+          transparent,
+          rgba(255, 255, 255, 0.22),
+          transparent
+        );
+        animation: loader-sweep 1.45s ease-in-out infinite;
+      }
+
+      .loader-card:nth-child(2)::after {
+        animation-delay: 180ms;
+      }
+
+      .loader-card:nth-child(3)::after {
+        animation-delay: 360ms;
+      }
+
+      .loader-line {
+        display: block;
+        height: 10px;
+        border-radius: 999px;
+        background: var(--surface-sunken);
+      }
+
+      .loader-line.short {
+        width: 42%;
+      }
+
+      .loader-line.medium {
+        width: 68%;
+      }
+
+      .loader-line.long {
+        width: 88%;
+      }
+
+      .loader-status {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+      }
+
+      .loader-status span {
+        border: 1px solid var(--border-soft);
+        border-radius: 999px;
+        color: var(--ink-tertiary);
+        font-size: 11px;
+        font-weight: 600;
+        letter-spacing: 0.10em;
+        padding: 6px 10px;
+        text-transform: uppercase;
+      }
+
+      @keyframes loader-sweep {
+        100% {
+          transform: translateX(120%);
+        }
+      }
+
       /* Round header */
       .round-header {
         display: grid;
@@ -543,10 +661,51 @@ export const SUS_WIDGET_HTML = `<!doctype html>
       }
 
       /* Cards */
-      .cards-grid {
+      .card-carousel {
         display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+        gap: 10px;
+      }
+
+      .carousel-toolbar {
+        display: flex;
+        justify-content: flex-end;
+      }
+
+      .carousel-actions {
+        display: flex;
+        gap: 6px;
+      }
+
+      .carousel-button {
+        width: 36px;
+        height: 36px;
+        padding: 0;
+        border-radius: 999px;
+        background: var(--surface-card);
+        border-color: var(--border-soft);
+        color: var(--ink-primary);
+        font-family: var(--font-display);
+        font-size: 24px;
+        font-weight: 500;
+        line-height: 1;
+      }
+
+      .carousel-button:hover {
+        background: var(--surface-subtle);
+        border-color: var(--ink-primary);
+      }
+
+      .cards-carousel-track {
+        display: flex;
         gap: 12px;
+        margin: -2px;
+        overflow-x: auto;
+        overscroll-behavior-x: contain;
+        padding: 2px 2px 12px;
+        scroll-padding: 2px;
+        scroll-snap-type: x mandatory;
+        scrollbar-width: thin;
+        -webkit-overflow-scrolling: touch;
       }
 
       .card {
@@ -557,7 +716,10 @@ export const SUS_WIDGET_HTML = `<!doctype html>
         padding: 0;
         text-align: left;
         display: block;
+        flex: 0 0 min(86vw, 430px);
         min-height: 320px;
+        scroll-snap-align: start;
+        scroll-snap-stop: always;
       }
 
       .card.selectable {
@@ -768,6 +930,158 @@ export const SUS_WIDGET_HTML = `<!doctype html>
         font-size: 13px;
         line-height: 1.55;
         color: var(--ink-secondary);
+      }
+
+      /* Audit (checking) state */
+      .card-back.auditing {
+        overflow: hidden;
+      }
+
+      .card-back.auditing .card-back-body {
+        gap: 14px;
+        align-content: start;
+      }
+
+      .audit-source {
+        font-size: 10px;
+        font-weight: 600;
+        letter-spacing: 0.14em;
+        text-transform: uppercase;
+        color: var(--ink-tertiary);
+        line-height: 1.4;
+        overflow-wrap: anywhere;
+      }
+
+      .audit-claim {
+        font-family: var(--font-display);
+        font-style: italic;
+        font-weight: 400;
+        font-size: 15px;
+        line-height: 1.4;
+        color: var(--ink-secondary);
+        letter-spacing: -0.005em;
+        text-wrap: balance;
+        position: relative;
+        padding-left: 12px;
+        border-left: 1px solid var(--border-soft);
+      }
+
+      .audit-rule {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        margin-top: 4px;
+      }
+
+      .audit-rule span {
+        font-size: 10px;
+        font-weight: 600;
+        letter-spacing: 0.18em;
+        text-transform: uppercase;
+        color: var(--accent);
+      }
+
+      .audit-rule::after {
+        content: "";
+        flex: 1;
+        height: 1px;
+        background: var(--border-hairline);
+      }
+
+      .audit-steps {
+        list-style: none;
+        margin: 0;
+        padding: 0;
+        display: grid;
+        gap: 9px;
+      }
+
+      .audit-step {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        font-size: 12px;
+        line-height: 1.4;
+        color: var(--ink-tertiary);
+        opacity: 0.45;
+        animation: auditStepText 4.4s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+      }
+
+      .audit-step::before {
+        content: "";
+        width: 6px;
+        height: 6px;
+        border-radius: 50%;
+        border: 1px solid var(--ink-tertiary);
+        background: transparent;
+        flex-shrink: 0;
+        animation: auditStepDot 4.4s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+      }
+
+      .audit-step:nth-child(1),
+      .audit-step:nth-child(1)::before { animation-delay: 0s; }
+      .audit-step:nth-child(2),
+      .audit-step:nth-child(2)::before { animation-delay: 1.1s; }
+      .audit-step:nth-child(3),
+      .audit-step:nth-child(3)::before { animation-delay: 2.2s; }
+      .audit-step:nth-child(4),
+      .audit-step:nth-child(4)::before { animation-delay: 3.3s; }
+
+      @keyframes auditStepText {
+        0%, 100% { color: var(--ink-tertiary); opacity: 0.45; }
+        6% { color: var(--ink-primary); opacity: 1; }
+        24%, 96% { color: var(--ink-secondary); opacity: 0.7; }
+      }
+
+      @keyframes auditStepDot {
+        0%, 100% {
+          background: transparent;
+          border-color: var(--ink-tertiary);
+          transform: scale(1);
+        }
+        6% {
+          background: var(--accent);
+          border-color: var(--accent);
+          transform: scale(1.3);
+        }
+        24%, 96% {
+          background: var(--ink-tertiary);
+          border-color: var(--ink-tertiary);
+          transform: scale(1);
+        }
+      }
+
+      .audit-scanline {
+        position: absolute;
+        left: 18px;
+        right: 18px;
+        top: 0;
+        height: 1px;
+        background: linear-gradient(
+          90deg,
+          transparent,
+          var(--accent-strong),
+          transparent
+        );
+        pointer-events: none;
+        animation: auditScanline 2.6s cubic-bezier(0.45, 0, 0.55, 1) infinite;
+      }
+
+      @keyframes auditScanline {
+        0% { top: 14%; opacity: 0; }
+        12% { opacity: 0.85; }
+        88% { opacity: 0.85; }
+        100% { top: 86%; opacity: 0; }
+      }
+
+      @media (prefers-reduced-motion: reduce) {
+        .audit-step,
+        .audit-step::before,
+        .audit-scanline {
+          animation: none;
+        }
+        .audit-step { opacity: 0.8; color: var(--ink-secondary); }
+        .audit-scanline { display: none; }
       }
 
       /* Panels (question + answer) */
@@ -1084,6 +1398,18 @@ export const SUS_WIDGET_HTML = `<!doctype html>
           gap: 28px;
         }
 
+        .case-loader {
+          min-height: 430px;
+        }
+
+        .case-loader-track {
+          grid-template-columns: 1fr;
+        }
+
+        .loader-card {
+          min-height: 128px;
+        }
+
         .round-header {
           grid-template-columns: 1fr;
           gap: 16px;
@@ -1114,8 +1440,14 @@ export const SUS_WIDGET_HTML = `<!doctype html>
           grid-template-columns: 1fr;
         }
 
-        .cards-grid {
-          grid-template-columns: 1fr;
+        .cards-carousel-track {
+          margin-inline: -18px;
+          padding-inline: 18px;
+          scroll-padding-inline: 18px;
+        }
+
+        .card {
+          flex-basis: min(86vw, 360px);
         }
 
         .asset-panel {
@@ -1142,6 +1474,10 @@ export const SUS_WIDGET_HTML = `<!doctype html>
         *::after {
           animation-duration: 0.01ms !important;
           transition-duration: 0.01ms !important;
+        }
+
+        .loader-card::after {
+          animation: none;
         }
       }
     </style>
@@ -1357,6 +1693,14 @@ export const SUS_WIDGET_HTML = `<!doctype html>
         const round = game.round || null;
         const status = game.status || (round ? "active" : "idle");
 
+        if (!round && state.busy === "Building case") {
+          root.innerHTML =
+            '<main class="shell">' + renderCaseLoader() + "</main>";
+          bindEvents();
+          notifyHeight();
+          return;
+        }
+
         if (!round && reveal) {
           root.innerHTML =
             '<main class="shell">' + renderSummary(game, reveal, status) + "</main>";
@@ -1480,6 +1824,45 @@ export const SUS_WIDGET_HTML = `<!doctype html>
           ),
           "</ol>",
           "</div>",
+          "</div>"
+        ].join("");
+      }
+
+      function renderCaseLoader() {
+        const topic = state.topic.trim();
+        const title = topic
+          ? 'Building <span class="case-loader-topic">' +
+            html(topic) +
+            "</span>"
+          : "Building the case file";
+
+        return [
+          '<section class="case-loader" role="status" aria-live="polite" aria-busy="true">',
+          '<div class="case-loader-header">',
+          '<p class="kicker kicker-accent">Case building</p>',
+          '<h1 class="case-loader-title">' + title + "</h1>",
+          '<p class="case-loader-copy">Gathering source cards, checking the claims, and hiding one subtle spin.</p>',
+          "</div>",
+          '<div class="case-loader-track" aria-hidden="true">',
+          renderLoaderCard("short", "long", "medium"),
+          renderLoaderCard("medium", "long", "short"),
+          renderLoaderCard("short", "medium", "long"),
+          "</div>",
+          '<div class="loader-status" aria-hidden="true">',
+          "<span>Search</span>",
+          "<span>Compare</span>",
+          "<span>Deal</span>",
+          "</div>",
+          "</section>"
+        ].join("");
+      }
+
+      function renderLoaderCard(first, second, third) {
+        return [
+          '<div class="loader-card">',
+          '<span class="loader-line ' + html(first) + '"></span>',
+          '<span class="loader-line ' + html(second) + '"></span>',
+          '<span class="loader-line ' + html(third) + '"></span>',
           "</div>"
         ].join("");
       }
@@ -1621,7 +2004,14 @@ export const SUS_WIDGET_HTML = `<!doctype html>
 
       function renderCards(cards, pendingQuestion, isComplete) {
         return [
-          '<section class="cards-grid" aria-label="Source cards">',
+          '<section class="card-carousel" aria-label="Source cards">',
+          '<div class="carousel-toolbar">',
+          '<div class="carousel-actions">',
+          '<button class="carousel-button" data-action="carousel-prev" type="button" aria-label="Previous card">&lsaquo;</button>',
+          '<button class="carousel-button" data-action="carousel-next" type="button" aria-label="Next card">&rsaquo;</button>',
+          "</div>",
+          "</div>",
+          '<div class="cards-carousel-track" data-card-carousel tabindex="0">',
           cards
             .map((card) => {
               const selectable =
@@ -1657,6 +2047,7 @@ export const SUS_WIDGET_HTML = `<!doctype html>
               ].join("");
             })
             .join(""),
+          "</div>",
           "</section>"
         ].join("");
       }
@@ -1703,23 +2094,54 @@ export const SUS_WIDGET_HTML = `<!doctype html>
       function renderCardBack(card, isChecking) {
         const verdict =
           card.verdict || (card.status === "cleared" ? "truth" : card.status);
+        const showAudit = isChecking && card.status === "remaining";
+
+        if (showAudit) {
+          return [
+            '<div class="card-face card-back auditing">',
+            '<div class="audit-scanline" aria-hidden="true"></div>',
+            '<div class="card-top">',
+            '<span class="card-id">' + html(card.id) + "</span>",
+            '<span class="card-status-tag">Auditing</span>',
+            "</div>",
+            '<div class="card-back-body">',
+            '<p class="audit-source">' +
+              html(card.sourceName + " · " + card.sourceType) +
+              "</p>",
+            '<p class="audit-claim">' + html(card.claim) + "</p>",
+            '<div class="audit-rule"><span>Auditing</span></div>',
+            '<ul class="audit-steps" aria-live="polite">',
+            '<li class="audit-step">Reading source</li>',
+            '<li class="audit-step">Comparing wording</li>',
+            '<li class="audit-step">Searching for caveats</li>',
+            '<li class="audit-step">Cross-checking hidden answer</li>',
+            "</ul>",
+            "</div>",
+            '<div class="card-bottom">',
+            '<span class="card-cta">' +
+              html(cardStateLabel(card.status)) +
+              "</span>",
+            renderSourceLink(card),
+            "</div>",
+            "</div>"
+          ].join("");
+        }
+
         const title =
           card.status === "lie"
             ? "Sus source"
             : verdict === "truth" || card.status === "cleared"
               ? "Careful claim"
-              : "Checking…";
+              : "Pending verdict";
         const body =
           card.explanation ||
-          (isChecking
-            ? "Cross-checking against the hidden answer."
-            : "The verdict will appear after the card is checked.");
+          "The verdict will appear after the card is checked.";
         const tag =
           verdict === "lie"
             ? "Lie"
             : verdict === "truth"
               ? "Truth"
-              : "Checking";
+              : "Pending";
 
         return [
           '<div class="card-face card-back">',
@@ -2052,9 +2474,33 @@ export const SUS_WIDGET_HTML = `<!doctype html>
           assetPromptInput.addEventListener("blur", persistUiState);
         }
 
+        const cardCarousel = root.querySelector("[data-card-carousel]");
+        if (cardCarousel) {
+          cardCarousel.addEventListener("keydown", (event) => {
+            if (event.key === "ArrowLeft") {
+              event.preventDefault();
+              scrollCards(-1);
+            }
+            if (event.key === "ArrowRight") {
+              event.preventDefault();
+              scrollCards(1);
+            }
+          });
+        }
+
         root.querySelectorAll("[data-action]").forEach((element) => {
           element.addEventListener("click", async (event) => {
             const action = element.getAttribute("data-action");
+            if (action === "carousel-prev") {
+              event.preventDefault();
+              scrollCards(-1);
+              return;
+            }
+            if (action === "carousel-next") {
+              event.preventDefault();
+              scrollCards(1);
+              return;
+            }
             if (action === "start-topic") {
               event.preventDefault();
               await startTopicRound();
@@ -2154,6 +2600,26 @@ export const SUS_WIDGET_HTML = `<!doctype html>
         }
         persistUiState();
         await runTool("start_round", { topic }, "Building case");
+      }
+
+      function scrollCards(direction) {
+        const carousel = root.querySelector("[data-card-carousel]");
+        if (!carousel) return;
+
+        const firstCard = carousel.querySelector(".card");
+        const styles = window.getComputedStyle(carousel);
+        const gap = Number.parseFloat(styles.columnGap || styles.gap || "0") || 0;
+        const distance = firstCard
+          ? firstCard.getBoundingClientRect().width + gap
+          : carousel.clientWidth * 0.85;
+        const prefersReducedMotion =
+          window.matchMedia &&
+          window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+        carousel.scrollBy({
+          left: distance * direction,
+          behavior: prefersReducedMotion ? "auto" : "smooth"
+        });
       }
 
       async function openSource(url) {

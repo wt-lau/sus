@@ -38,11 +38,29 @@ import {
   SUS_WIDGET_MIME_TYPE,
   SUS_WIDGET_URI
 } from "./widget";
+import {
+  AuthChallengeError,
+  AuthConfigurationError,
+  OAUTH_PROTECTED_RESOURCE_PATH,
+  createAuthErrorResponse,
+  createProtectedResourceMetadataResponse,
+  getToolSecuritySchemes,
+  playerDurableObjectName,
+  readTrustedPlayerIdentity,
+  requestWithPlayerIdentity,
+  resolvePlayerIdentity,
+  type PlayerIdentity
+} from "./auth";
+import {
+  getLeaderboard,
+  persistCompletedRoundScore,
+  type PersistedRoundScore
+} from "./leaderboard";
 
 const gameViewOutputSchema = z.object({}).passthrough();
 const MCP_PATH = "/mcp";
 const MCP_TRANSPORT_STATE_KEY = "mcp-transport-state";
-const DEFAULT_MCP_SESSION_NAME = "last-user-session";
+const PLAYER_IDENTITY_STATE_KEY = "player-identity";
 const WORKERS_AI_IMAGE_MODEL = "@cf/black-forest-labs/flux-1-schnell";
 const susWidgetResourceMeta = {
   ui: {
@@ -121,6 +139,13 @@ function dataToolMeta(invoking: string, invoked: string) {
   };
 }
 
+function withToolSecuritySchemes(env: Env, meta: Record<string, unknown>) {
+  return {
+    ...meta,
+    securitySchemes: getToolSecuritySchemes(env)
+  };
+}
+
 function noRoundResponse() {
   return jsonResponse({
     status: "idle",
@@ -153,24 +178,6 @@ function createSession() {
 
 function isMcpPath(pathname: string) {
   return pathname === MCP_PATH || pathname.startsWith(`${MCP_PATH}/`);
-}
-
-function normalizeSessionName(value: string | null) {
-  const normalized = value
-    ?.trim()
-    .replace(/[^a-zA-Z0-9._:-]/g, "-")
-    .slice(0, 256);
-
-  return normalized || DEFAULT_MCP_SESSION_NAME;
-}
-
-function resolveMcpSessionName(request: Request) {
-  const url = new URL(request.url);
-  return normalizeSessionName(
-    request.headers.get("mcp-session-id") ??
-      request.headers.get("x-sus-session-id") ??
-      url.searchParams.get("session")
-  );
 }
 
 async function isMcpInitializeRequest(request: Request) {
@@ -396,6 +403,7 @@ export class SusGameMcp extends Agent<Env, GameState> {
   initialState: GameState = createInitialGameState();
   private toolsRegistered = false;
   private transport = this.createTransport();
+  private playerIdentity: PlayerIdentity | null = null;
 
   private createServer() {
     return new McpServer({
@@ -429,7 +437,63 @@ export class SusGameMcp extends Agent<Env, GameState> {
     this.transport = this.createTransport();
   }
 
+  private dataToolMeta(invoking: string, invoked: string) {
+    return withToolSecuritySchemes(this.env, dataToolMeta(invoking, invoked));
+  }
+
+  private widgetToolMeta(invoking: string, invoked: string) {
+    return withToolSecuritySchemes(this.env, widgetToolMeta(invoking, invoked));
+  }
+
+  private async syncPlayerIdentity(request: Request) {
+    const requestPlayer = readTrustedPlayerIdentity(request);
+    if (requestPlayer) {
+      this.playerIdentity = requestPlayer;
+      await this.ctx.storage.put(PLAYER_IDENTITY_STATE_KEY, requestPlayer);
+      return requestPlayer;
+    }
+
+    if (!this.playerIdentity) {
+      this.playerIdentity =
+        (await this.ctx.storage.get<PlayerIdentity>(
+          PLAYER_IDENTITY_STATE_KEY
+        )) ?? null;
+    }
+
+    return this.playerIdentity;
+  }
+
+  private async getPlayerIdentity() {
+    if (this.playerIdentity) return this.playerIdentity;
+
+    this.playerIdentity = (await this.ctx.storage.get<PlayerIdentity>(
+      PLAYER_IDENTITY_STATE_KEY
+    )) ?? {
+      id: this.name,
+      displayName: "Guest player",
+      source: "session"
+    };
+
+    return this.playerIdentity;
+  }
+
+  private async persistScore(score: GameState["score"]) {
+    try {
+      const player = await this.getPlayerIdentity();
+      return await persistCompletedRoundScore(this.env.SUS_DB, player, score);
+    } catch (error) {
+      return {
+        persisted: false,
+        reason:
+          error instanceof Error
+            ? error.message
+            : "Leaderboard score could not be persisted."
+      } satisfies PersistedRoundScore;
+    }
+  }
+
   async onRequest(request: Request) {
+    await this.syncPlayerIdentity(request);
     await this.prepareTransportForRequest(request);
 
     if (!this.toolsRegistered) {
@@ -478,7 +542,7 @@ export class SusGameMcp extends Agent<Env, GameState> {
           openWorldHint: false,
           idempotentHint: true
         },
-        _meta: dataToolMeta("Loading rules", "Rules ready")
+        _meta: this.dataToolMeta("Loading rules", "Rules ready")
       },
       async () =>
         jsonResponse({
@@ -511,7 +575,7 @@ export class SusGameMcp extends Agent<Env, GameState> {
           openWorldHint: false,
           idempotentHint: true
         },
-        _meta: dataToolMeta("Loading topics", "Topics ready")
+        _meta: this.dataToolMeta("Loading topics", "Topics ready")
       },
       async () =>
         jsonResponse({
@@ -549,7 +613,7 @@ export class SusGameMcp extends Agent<Env, GameState> {
           idempotentHint: false,
           openWorldHint: false
         },
-        _meta: widgetToolMeta("Opening Sus", "Sus ready")
+        _meta: this.widgetToolMeta("Opening Sus", "Sus ready")
       },
       async ({ restart, topic }) => {
         if (
@@ -603,7 +667,7 @@ export class SusGameMcp extends Agent<Env, GameState> {
           idempotentHint: true,
           openWorldHint: false
         },
-        _meta: widgetToolMeta("Opening board", "Board ready")
+        _meta: this.widgetToolMeta("Opening board", "Board ready")
       },
       async () => {
         if (!this.state.round) {
@@ -657,7 +721,7 @@ export class SusGameMcp extends Agent<Env, GameState> {
           idempotentHint: false,
           openWorldHint: true
         },
-        _meta: widgetToolMeta("Dealing round", "Round ready")
+        _meta: this.widgetToolMeta("Dealing round", "Round ready")
       },
       async ({ topic, sources }) => {
         let preparedRound: RoundPreparation;
@@ -722,7 +786,7 @@ export class SusGameMcp extends Agent<Env, GameState> {
           idempotentHint: false,
           openWorldHint: true
         },
-        _meta: widgetToolMeta("Generating asset", "Asset ready")
+        _meta: this.widgetToolMeta("Generating asset", "Asset ready")
       },
       async ({ prompt, force }) => {
         const round = this.state.round;
@@ -803,7 +867,7 @@ export class SusGameMcp extends Agent<Env, GameState> {
           openWorldHint: false,
           idempotentHint: true
         },
-        _meta: dataToolMeta("Loading round", "Round loaded")
+        _meta: this.dataToolMeta("Loading round", "Round loaded")
       },
       async () => {
         if (!this.state.round) return noRoundResponse();
@@ -842,7 +906,7 @@ export class SusGameMcp extends Agent<Env, GameState> {
           idempotentHint: false,
           openWorldHint: false
         },
-        _meta: dataToolMeta("Checking card", "Card checked")
+        _meta: this.dataToolMeta("Checking card", "Card checked")
       },
       async ({ cardId }) => {
         const round = this.state.round;
@@ -915,6 +979,7 @@ export class SusGameMcp extends Agent<Env, GameState> {
             score
           };
           this.setState(nextState);
+          const leaderboard = await this.persistScore(nextState.score);
 
           return jsonResponse({
             status: "won",
@@ -923,6 +988,7 @@ export class SusGameMcp extends Agent<Env, GameState> {
             round: toPublicRound(round, nextState),
             reveal: revealRound(round, nextState),
             score: nextState.score,
+            leaderboard,
             nextActions: [
               "Review the summary.",
               "Use Play again to start another round."
@@ -958,6 +1024,8 @@ export class SusGameMcp extends Agent<Env, GameState> {
         this.setState(nextState);
 
         if (solvedByElimination) {
+          const leaderboard = await this.persistScore(nextState.score);
+
           return jsonResponse({
             status: "won",
             message: `That source checks out. It was the last truthful card, so the remaining card is the sus source. +${score.lastRound?.points ?? 0} points.`,
@@ -965,6 +1033,7 @@ export class SusGameMcp extends Agent<Env, GameState> {
             round: toPublicRound(round, nextState),
             reveal: revealRound(round, nextState),
             score: nextState.score,
+            leaderboard,
             nextActions: [
               "Review the summary.",
               "Use Play again to start another round."
@@ -1008,7 +1077,7 @@ export class SusGameMcp extends Agent<Env, GameState> {
           idempotentHint: false,
           openWorldHint: true
         },
-        _meta: dataToolMeta("Answering question", "Question answered")
+        _meta: this.dataToolMeta("Answering question", "Question answered")
       },
       async ({ question }) => {
         const round = this.state.round;
@@ -1083,7 +1152,7 @@ export class SusGameMcp extends Agent<Env, GameState> {
           idempotentHint: false,
           openWorldHint: false
         },
-        _meta: dataToolMeta("Revealing", "Revealed")
+        _meta: this.dataToolMeta("Revealing", "Revealed")
       },
       async () => {
         const round = this.state.round;
@@ -1100,6 +1169,13 @@ export class SusGameMcp extends Agent<Env, GameState> {
           score
         };
         this.setState(nextState);
+        const leaderboard =
+          nextState.status === "revealed"
+            ? await this.persistScore(nextState.score)
+            : {
+                persisted: false,
+                reason: "Round was already solved before reveal."
+              };
 
         return jsonResponse({
           status: nextState.status,
@@ -1111,11 +1187,69 @@ export class SusGameMcp extends Agent<Env, GameState> {
               : "Round revealed. Review the false spin before starting another case.",
           reveal: revealRound(round, nextState),
           score: nextState.score,
+          leaderboard,
           nextActions: [
             "Review the summary.",
             "Use Play again to start another round."
           ]
         });
+      }
+    );
+
+    this.server.registerTool(
+      "get_leaderboard",
+      {
+        title: "Get Sus leaderboard",
+        description:
+          "Use this when the user asks for Sus standings, personal rank, or the current leaderboard.",
+        inputSchema: {
+          limit: z
+            .number()
+            .int()
+            .min(1)
+            .max(50)
+            .optional()
+            .describe("Maximum number of top players to return.")
+        },
+        outputSchema: gameViewOutputSchema,
+        annotations: {
+          readOnlyHint: true,
+          destructiveHint: false,
+          idempotentHint: true,
+          openWorldHint: false
+        },
+        _meta: this.dataToolMeta("Loading leaderboard", "Leaderboard ready")
+      },
+      async ({ limit }) => {
+        const player = await this.getPlayerIdentity();
+
+        try {
+          const leaderboard = await getLeaderboard(
+            this.env.SUS_DB,
+            player.id,
+            limit
+          );
+
+          return jsonResponse({
+            status: "leaderboard-ready",
+            player,
+            leaderboard,
+            nextActions: ["Start another round to climb the leaderboard."]
+          });
+        } catch (error) {
+          return jsonResponse({
+            status: "leaderboard-unavailable",
+            message:
+              error instanceof Error
+                ? error.message
+                : "Leaderboard is unavailable.",
+            player,
+            nextActions: [
+              "Apply the D1 migrations.",
+              "Then finish a round to create a leaderboard entry."
+            ]
+          });
+        }
       }
     );
 
@@ -1139,7 +1273,7 @@ export class SusGameMcp extends Agent<Env, GameState> {
           idempotentHint: false,
           openWorldHint: false
         },
-        _meta: dataToolMeta("Resetting", "Reset")
+        _meta: this.dataToolMeta("Resetting", "Reset")
       },
       async ({ clearScore }) => {
         const previousScore = normalizeScore(this.state.score);
@@ -1202,10 +1336,28 @@ export default {
       });
     }
 
+    if (url.pathname === OAUTH_PROTECTED_RESOURCE_PATH) {
+      return createProtectedResourceMetadataResponse(request, env);
+    }
+
     if (isMcpPath(url.pathname)) {
-      const sessionName = resolveMcpSessionName(request);
-      const agent = await getAgentByName(env.SusGameMcp, sessionName);
-      return agent.onRequest(request);
+      try {
+        const player = await resolvePlayerIdentity(request, env);
+        const agent = await getAgentByName(
+          env.SusGameMcp,
+          playerDurableObjectName(player)
+        );
+        return agent.fetch(requestWithPlayerIdentity(request, player));
+      } catch (error) {
+        if (
+          error instanceof AuthChallengeError ||
+          error instanceof AuthConfigurationError
+        ) {
+          return createAuthErrorResponse(request, env, error);
+        }
+
+        throw error;
+      }
     }
 
     return new Response("Not Found", { status: 404 });
