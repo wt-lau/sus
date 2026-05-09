@@ -1,5 +1,10 @@
+import { Agent, getAgentByName } from "agents";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
-import { McpAgent } from "agents/mcp";
+import {
+  createMcpHandler,
+  WorkerTransport,
+  type TransportState
+} from "agents/mcp";
 import { z } from "zod";
 import {
   ExaAnswerError,
@@ -13,10 +18,15 @@ import {
   answerQuestion,
   createInitialGameState,
   createRound,
+  finishScoredRound,
   getRemainingCards,
   listTopics,
+  normalizeScore,
   normalizeCardId,
+  recordScoreQuestion,
+  recordWrongGuess,
   revealRound,
+  startScoredRound,
   toPublicRound,
   type CardId,
   type GeneratedImageAsset,
@@ -30,13 +40,19 @@ import {
 } from "./widget";
 
 const gameViewOutputSchema = z.object({}).passthrough();
+const MCP_PATH = "/mcp";
+const MCP_TRANSPORT_STATE_KEY = "mcp-transport-state";
+const DEFAULT_MCP_SESSION_NAME = "last-user-session";
 const WORKERS_AI_IMAGE_MODEL = "@cf/black-forest-labs/flux-1-schnell";
 const susWidgetResourceMeta = {
   ui: {
     prefersBorder: true,
     csp: {
       connectDomains: [],
-      resourceDomains: []
+      resourceDomains: [
+        "https://fonts.googleapis.com",
+        "https://fonts.gstatic.com"
+      ]
     }
   },
   "openai/widgetDescription":
@@ -44,7 +60,10 @@ const susWidgetResourceMeta = {
   "openai/widgetPrefersBorder": true,
   "openai/widgetCSP": {
     connect_domains: [],
-    resource_domains: []
+    resource_domains: [
+      "https://fonts.googleapis.com",
+      "https://fonts.gstatic.com"
+    ]
   }
 };
 
@@ -130,6 +149,40 @@ function createSession() {
     id: crypto.randomUUID(),
     startedAt: new Date().toISOString()
   };
+}
+
+function isMcpPath(pathname: string) {
+  return pathname === MCP_PATH || pathname.startsWith(`${MCP_PATH}/`);
+}
+
+function normalizeSessionName(value: string | null) {
+  const normalized = value
+    ?.trim()
+    .replace(/[^a-zA-Z0-9._:-]/g, "-")
+    .slice(0, 256);
+
+  return normalized || DEFAULT_MCP_SESSION_NAME;
+}
+
+function resolveMcpSessionName(request: Request) {
+  const url = new URL(request.url);
+  return normalizeSessionName(
+    request.headers.get("mcp-session-id") ??
+      request.headers.get("x-sus-session-id") ??
+      url.searchParams.get("session")
+  );
+}
+
+async function isMcpInitializeRequest(request: Request) {
+  if (request.method !== "POST") return false;
+
+  try {
+    const payload = await request.clone().json();
+    const messages = Array.isArray(payload) ? payload : [payload];
+    return messages.some((message) => message?.method === "initialize");
+  } catch {
+    return false;
+  }
 }
 
 type RoundPreparation =
@@ -337,17 +390,58 @@ function assetErrorMessage(error: unknown) {
     : "Unknown Workers AI image generation error";
 }
 
-export class SusGameMcp extends McpAgent<
-  Env,
-  GameState,
-  Record<string, never>
-> {
-  server = new McpServer({
-    name: "sus-source-checking-game",
-    version: "0.1.0"
-  });
+export class SusGameMcp extends Agent<Env, GameState> {
+  server = this.createServer();
 
   initialState: GameState = createInitialGameState();
+  private toolsRegistered = false;
+  private transport = this.createTransport();
+
+  private createServer() {
+    return new McpServer({
+      name: "sus-source-checking-game",
+      version: "0.1.0"
+    });
+  }
+
+  private createTransport() {
+    return new WorkerTransport({
+      sessionIdGenerator: () => this.name,
+      storage: {
+        get: () =>
+          this.ctx.storage.get<TransportState>(MCP_TRANSPORT_STATE_KEY),
+        set: (state) => this.ctx.storage.put(MCP_TRANSPORT_STATE_KEY, state)
+      }
+    });
+  }
+
+  private async prepareTransportForRequest(request: Request) {
+    if (!(await isMcpInitializeRequest(request))) return;
+
+    const transportState = await this.ctx.storage.get<TransportState>(
+      MCP_TRANSPORT_STATE_KEY
+    );
+    if (!transportState?.initialized) return;
+
+    await this.ctx.storage.delete(MCP_TRANSPORT_STATE_KEY);
+    this.server = this.createServer();
+    this.toolsRegistered = false;
+    this.transport = this.createTransport();
+  }
+
+  async onRequest(request: Request) {
+    await this.prepareTransportForRequest(request);
+
+    if (!this.toolsRegistered) {
+      await this.init();
+      this.toolsRegistered = true;
+    }
+
+    return createMcpHandler(this.server, {
+      route: MCP_PATH,
+      transport: this.transport
+    })(request, this.env, this.ctx as unknown as ExecutionContext);
+  }
 
   async init() {
     this.server.registerResource(
@@ -481,7 +575,7 @@ export class SusGameMcp extends McpAgent<
         const session = freshSession ? createSession() : this.state.session;
         const previousScore = freshSession
           ? createInitialGameState().score
-          : this.state.score;
+          : normalizeScore(this.state.score);
         const nextState: GameState = {
           ...createInitialGameState(),
           session,
@@ -575,17 +669,13 @@ export class SusGameMcp extends McpAgent<
 
         const { round, sourceSearch } = preparedRound;
         const session = this.state?.session ?? createSession();
-        const previousScore =
-          this.state?.score ?? createInitialGameState().score;
+        const previousScore = normalizeScore(this.state?.score);
         const nextState: GameState = {
           ...createInitialGameState(),
           session,
           status: "active",
           round,
-          score: {
-            ...previousScore,
-            roundsStarted: previousScore.roundsStarted + 1
-          }
+          score: startScoredRound(previousScore, round)
         };
 
         this.setState(nextState);
@@ -595,6 +685,7 @@ export class SusGameMcp extends McpAgent<
           message: `Round started: ${round.topic}`,
           session,
           round: toPublicRound(round, nextState),
+          score: nextState.score,
           sourceSearch,
           nextActions: [
             "Review the five cards.",
@@ -762,7 +853,8 @@ export class SusGameMcp extends McpAgent<
             status: this.state.status,
             message: "This round is already complete.",
             round: toPublicRound(round, this.state),
-            reveal: revealRound(round, this.state)
+            reveal: revealRound(round, this.state),
+            score: normalizeScore(this.state.score)
           });
         }
 
@@ -772,6 +864,7 @@ export class SusGameMcp extends McpAgent<
             message:
               "You cleared a truthful source on the previous guess. Ask one question before guessing again.",
             round: toPublicRound(round, this.state),
+            score: normalizeScore(this.state.score),
             nextActions: ["ask_question"]
           });
         }
@@ -786,6 +879,7 @@ export class SusGameMcp extends McpAgent<
             status: "invalid-card",
             message: `Card '${cardId}' is not in this round.`,
             round: toPublicRound(round, this.state),
+            score: normalizeScore(this.state.score),
             validCardIds: round.cards.map((candidate) => candidate.id)
           });
         }
@@ -794,7 +888,8 @@ export class SusGameMcp extends McpAgent<
           return jsonResponse({
             status: "already-cleared",
             message: `Card ${card.id} has already been cleared as truthful.`,
-            round: toPublicRound(round, this.state)
+            round: toPublicRound(round, this.state),
+            score: normalizeScore(this.state.score)
           });
         }
 
@@ -806,21 +901,24 @@ export class SusGameMcp extends McpAgent<
         } as const;
 
         if (card.verdict === "lie") {
+          const score = finishScoredRound(
+            this.state.score,
+            round,
+            "direct-win",
+            guess.guessedAt
+          );
           const nextState: GameState = {
             ...this.state,
             status: "won",
             guesses: [...this.state.guesses, guess],
             pendingQuestion: false,
-            score: {
-              ...this.state.score,
-              wins: this.state.score.wins + 1
-            }
+            score
           };
           this.setState(nextState);
 
           return jsonResponse({
             status: "won",
-            message: `Correct. Card ${card.id} is the sus source.`,
+            message: `Correct. Card ${card.id} is the sus source. +${score.lastRound?.points ?? 0} points.`,
             session: nextState.session,
             round: toPublicRound(round, nextState),
             reveal: revealRound(round, nextState),
@@ -836,25 +934,33 @@ export class SusGameMcp extends McpAgent<
         const remainingCards = getRemainingCards(round, eliminatedIds);
         const solvedByElimination =
           remainingCards.length === 1 && remainingCards[0]?.verdict === "lie";
+        const scoreAfterWrongGuess = recordWrongGuess(
+          this.state.score,
+          round,
+          guess.guessedAt
+        );
+        const score = solvedByElimination
+          ? finishScoredRound(
+              scoreAfterWrongGuess,
+              round,
+              "elimination-win",
+              guess.guessedAt
+            )
+          : scoreAfterWrongGuess;
         const nextState: GameState = {
           ...this.state,
           status: solvedByElimination ? "won" : "active",
           eliminatedIds,
           guesses: [...this.state.guesses, guess],
           pendingQuestion: solvedByElimination ? false : true,
-          score: {
-            ...this.state.score,
-            wins: this.state.score.wins + (solvedByElimination ? 1 : 0),
-            wrongGuesses: this.state.score.wrongGuesses + 1
-          }
+          score
         };
         this.setState(nextState);
 
         if (solvedByElimination) {
           return jsonResponse({
             status: "won",
-            message:
-              "That source checks out. It was the last truthful card, so the remaining card is the sus source.",
+            message: `That source checks out. It was the last truthful card, so the remaining card is the sus source. +${score.lastRound?.points ?? 0} points.`,
             session: nextState.session,
             round: toPublicRound(round, nextState),
             reveal: revealRound(round, nextState),
@@ -874,7 +980,9 @@ export class SusGameMcp extends McpAgent<
             sourceName: card.sourceName,
             explanation: card.explanation
           },
+          session: nextState.session,
           round: toPublicRound(round, nextState),
+          score: nextState.score,
           nextActions: ["Call ask_question before guessing again."]
         });
       }
@@ -911,7 +1019,8 @@ export class SusGameMcp extends McpAgent<
             status: this.state.status,
             message: "This round is already complete.",
             round: toPublicRound(round, this.state),
-            reveal: revealRound(round, this.state)
+            reveal: revealRound(round, this.state),
+            score: normalizeScore(this.state.score)
           });
         }
 
@@ -921,6 +1030,7 @@ export class SusGameMcp extends McpAgent<
             message:
               "Questions unlock only after you guess a truthful source. Make a guess first.",
             round: toPublicRound(round, this.state),
+            score: normalizeScore(this.state.score),
             nextActions: ["guess_sus_source"]
           });
         }
@@ -931,6 +1041,7 @@ export class SusGameMcp extends McpAgent<
           this.state.eliminatedIds,
           this.env.EXA_API_KEY
         );
+        const askedAt = new Date().toISOString();
         const nextState: GameState = {
           ...this.state,
           pendingQuestion: false,
@@ -941,16 +1052,19 @@ export class SusGameMcp extends McpAgent<
               answer: answer.summary,
               answerSource: answer.source,
               citations: questionCitationRecords(answer.citations),
-              askedAt: new Date().toISOString()
+              askedAt
             }
-          ]
+          ],
+          score: recordScoreQuestion(this.state.score, round, askedAt)
         };
         this.setState(nextState);
 
         return jsonResponse({
           status: "question-answered",
           answer,
+          session: nextState.session,
           round: toPublicRound(round, nextState),
+          score: nextState.score,
           nextActions: ["Call guess_sus_source with your next suspect."]
         });
       }
@@ -975,10 +1089,15 @@ export class SusGameMcp extends McpAgent<
         const round = this.state.round;
         if (!round) return noRoundResponse();
 
+        const score =
+          this.state.status === "won" || this.state.status === "revealed"
+            ? normalizeScore(this.state.score)
+            : finishScoredRound(this.state.score, round, "revealed");
         const nextState: GameState = {
           ...this.state,
           status: this.state.status === "won" ? "won" : "revealed",
-          pendingQuestion: false
+          pendingQuestion: false,
+          score
         };
         this.setState(nextState);
 
@@ -1023,7 +1142,7 @@ export class SusGameMcp extends McpAgent<
         _meta: dataToolMeta("Resetting", "Reset")
       },
       async ({ clearScore }) => {
-        const previousScore = this.state.score;
+        const previousScore = normalizeScore(this.state.score);
         const previousSession = this.state.session;
         const nextState = createInitialGameState();
         if (!clearScore) {
@@ -1050,7 +1169,6 @@ export class SusGameMcp extends McpAgent<
   }
 }
 
-const mcpHandler = SusGameMcp.serve("/mcp", { binding: "SusGameMcp" });
 const APP_HTML = `
 <!doctype html>
 <html lang="en">
@@ -1075,7 +1193,7 @@ const APP_HTML = `
 `.trim();
 
 export default {
-  async fetch(request: Request, env: Env, ctx: ExecutionContext) {
+  async fetch(request: Request, env: Env, _ctx: ExecutionContext) {
     const url = new URL(request.url);
 
     if (url.pathname === "/") {
@@ -1084,6 +1202,12 @@ export default {
       });
     }
 
-    return mcpHandler.fetch(request, env, ctx);
+    if (isMcpPath(url.pathname)) {
+      const sessionName = resolveMcpSessionName(request);
+      const agent = await getAgentByName(env.SusGameMcp, sessionName);
+      return agent.onRequest(request);
+    }
+
+    return new Response("Not Found", { status: 404 });
   }
 } satisfies ExportedHandler<Env>;

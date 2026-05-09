@@ -62,7 +62,9 @@ The round engine supports three modes:
 - Custom round: pass exactly five source cards and Sus spins one into the lie.
 
 The active session keeps score, cleared cards, clue questions, and reveal state
-across MCP tool calls.
+across MCP tool calls. Scoring now awards points for clean reads, streaks,
+comebacks, and no-clue solves while tracking round grades, rank progress, and
+earned badges.
 When a player earns a question, `ask_question` uses Exa Answer when
 `EXA_API_KEY` is configured and falls back to the source-card evidence if Exa is
 unavailable.
@@ -179,4 +181,5 @@ the latest generated data URI in the `McpAgent` state for the current session.
 
 - Cloudflare R2 storage for generated round assets.
 - Clip generation from the selected topic.
-- A polished scoring screen for streaks, fastest solves, and cleanest reads.
+- Durable player profiles or leaderboards if the score should survive beyond an
+  MCP session.

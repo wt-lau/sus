@@ -89,6 +89,82 @@ export type GameAssets = {
   imageError: string | null;
 };
 
+export type ScoreBadgeId =
+  | "first-case"
+  | "perfect-read"
+  | "clean-read"
+  | "no-clue-needed"
+  | "comeback-analyst"
+  | "last-card-logic"
+  | "hot-streak"
+  | "question-ledger";
+
+export type ScoreBadge = {
+  id: ScoreBadgeId;
+  label: string;
+  description: string;
+  count: number;
+  firstEarnedAt: string;
+  lastEarnedAt: string;
+};
+
+export type AwardedBadge = Omit<
+  ScoreBadge,
+  "count" | "firstEarnedAt" | "lastEarnedAt"
+>;
+
+export type ScoreRank = {
+  label: string;
+  minPoints: number;
+  nextLabel: string | null;
+  pointsToNext: number | null;
+};
+
+export type ScoreRound = {
+  roundId: string;
+  topic: string;
+  status: "active" | "won" | "revealed";
+  outcome: "active" | "direct-win" | "elimination-win" | "revealed";
+  startedAt: string;
+  finishedAt: string | null;
+  points: number;
+  basePoints: number;
+  mistakes: number;
+  questions: number;
+  clearedTruths: number;
+  penalties: {
+    wrongGuesses: number;
+    questions: number;
+    reveal: number;
+  };
+  bonuses: {
+    cleanRead: number;
+    noClue: number;
+    streak: number;
+    comeback: number;
+  };
+  badges: AwardedBadge[];
+  grade: "S" | "A" | "B" | "C" | "D" | "Reveal";
+  summary: string;
+};
+
+export type GameScore = {
+  roundsStarted: number;
+  wins: number;
+  wrongGuesses: number;
+  totalQuestions: number;
+  reveals: number;
+  totalPoints: number;
+  currentStreak: number;
+  bestStreak: number;
+  perfectRounds: number;
+  activeRound: ScoreRound | null;
+  lastRound: ScoreRound | null;
+  recentRounds: ScoreRound[];
+  badges: ScoreBadge[];
+  rank: ScoreRank;
+};
+
 export type GameState = {
   session: {
     id: string;
@@ -101,11 +177,72 @@ export type GameState = {
   guesses: GuessRecord[];
   questions: QuestionRecord[];
   assets: GameAssets;
-  score: {
-    roundsStarted: number;
-    wins: number;
-    wrongGuesses: number;
-  };
+  score: GameScore;
+};
+
+const SCORE_RULES = {
+  baseWin: 1000,
+  wrongGuessPenalty: 220,
+  questionPenalty: 80,
+  revealPenalty: 1000,
+  cleanReadBonus: 350,
+  noClueBonus: 150,
+  comebackBonus: 120,
+  streakBonusStep: 125,
+  maxStreakBonus: 500,
+  minimumWinScore: 150,
+  recentRoundLimit: 8
+} as const;
+
+const SCORE_RANKS = [
+  { label: "New Investigator", minPoints: 0 },
+  { label: "Caveat Spotter", minPoints: 1200 },
+  { label: "Source Sleuth", minPoints: 2800 },
+  { label: "Signal Analyst", minPoints: 5200 },
+  { label: "Truth Editor", minPoints: 9000 }
+] as const;
+
+const BADGE_DEFINITIONS: Record<ScoreBadgeId, AwardedBadge> = {
+  "first-case": {
+    id: "first-case",
+    label: "First Case",
+    description: "Closed your first case."
+  },
+  "perfect-read": {
+    id: "perfect-read",
+    label: "Perfect Read",
+    description: "Found the sus source with no wrong guesses or clue questions."
+  },
+  "clean-read": {
+    id: "clean-read",
+    label: "Clean Read",
+    description: "Found the sus source on the first accusation."
+  },
+  "no-clue-needed": {
+    id: "no-clue-needed",
+    label: "No Clue Needed",
+    description: "Solved the case without spending a clue question."
+  },
+  "comeback-analyst": {
+    id: "comeback-analyst",
+    label: "Comeback Analyst",
+    description: "Recovered after clearing multiple truthful sources."
+  },
+  "last-card-logic": {
+    id: "last-card-logic",
+    label: "Last Card Logic",
+    description: "Solved by eliminating every careful source."
+  },
+  "hot-streak": {
+    id: "hot-streak",
+    label: "Hot Streak",
+    description: "Solved at least three cases in a row."
+  },
+  "question-ledger": {
+    id: "question-ledger",
+    label: "Question Ledger",
+    description: "Used multiple clue questions and still closed the case."
+  }
 };
 
 const TOPIC_PACKS: TopicPack[] = [
@@ -553,12 +690,203 @@ export function createInitialGameState(): GameState {
       image: null,
       imageError: null
     },
-    score: {
-      roundsStarted: 0,
-      wins: 0,
-      wrongGuesses: 0
-    }
+    score: createInitialScore()
   };
+}
+
+export function createInitialScore(): GameScore {
+  return normalizeScore();
+}
+
+export function normalizeScore(score?: Partial<GameScore> | null): GameScore {
+  const totalPoints = asNumber(score?.totalPoints);
+  const rank = getScoreRank(totalPoints);
+  const activeRound = normalizeScoreRound(score?.activeRound);
+  const lastRound = normalizeScoreRound(score?.lastRound);
+
+  return {
+    roundsStarted: asNumber(score?.roundsStarted),
+    wins: asNumber(score?.wins),
+    wrongGuesses: asNumber(score?.wrongGuesses),
+    totalQuestions: asNumber(score?.totalQuestions),
+    reveals: asNumber(score?.reveals),
+    totalPoints,
+    currentStreak: asNumber(score?.currentStreak),
+    bestStreak: asNumber(score?.bestStreak),
+    perfectRounds: asNumber(score?.perfectRounds),
+    activeRound,
+    lastRound,
+    recentRounds: Array.isArray(score?.recentRounds)
+      ? score.recentRounds
+          .map((round) => normalizeScoreRound(round))
+          .filter((round): round is ScoreRound => Boolean(round))
+          .slice(0, SCORE_RULES.recentRoundLimit)
+      : [],
+    badges: Array.isArray(score?.badges)
+      ? score.badges.map(normalizeScoreBadge).filter(isScoreBadge)
+      : [],
+    rank
+  };
+}
+
+export function startScoredRound(
+  score: GameScore | Partial<GameScore> | undefined,
+  round: Round,
+  startedAt = new Date().toISOString()
+): GameScore {
+  const normalizedScore = normalizeScore(score);
+  const activeRound = createActiveScoreRound(round, startedAt);
+
+  return refreshScoreRank({
+    ...normalizedScore,
+    roundsStarted: normalizedScore.roundsStarted + 1,
+    activeRound
+  });
+}
+
+export function recordWrongGuess(
+  score: GameScore | Partial<GameScore> | undefined,
+  round: Round,
+  guessedAt = new Date().toISOString()
+): GameScore {
+  const normalizedScore = normalizeScore(score);
+  const activeRound =
+    normalizedScore.activeRound?.roundId === round.id
+      ? normalizedScore.activeRound
+      : createActiveScoreRound(round, guessedAt);
+
+  return refreshScoreRank({
+    ...normalizedScore,
+    wrongGuesses: normalizedScore.wrongGuesses + 1,
+    activeRound: {
+      ...activeRound,
+      mistakes: activeRound.mistakes + 1,
+      clearedTruths: activeRound.clearedTruths + 1
+    }
+  });
+}
+
+export function recordScoreQuestion(
+  score: GameScore | Partial<GameScore> | undefined,
+  round: Round,
+  askedAt = new Date().toISOString()
+): GameScore {
+  const normalizedScore = normalizeScore(score);
+  const activeRound =
+    normalizedScore.activeRound?.roundId === round.id
+      ? normalizedScore.activeRound
+      : createActiveScoreRound(round, askedAt);
+
+  return refreshScoreRank({
+    ...normalizedScore,
+    totalQuestions: normalizedScore.totalQuestions + 1,
+    activeRound: {
+      ...activeRound,
+      questions: activeRound.questions + 1
+    }
+  });
+}
+
+export function finishScoredRound(
+  score: GameScore | Partial<GameScore> | undefined,
+  round: Round,
+  outcome: "direct-win" | "elimination-win" | "revealed",
+  finishedAt = new Date().toISOString()
+): GameScore {
+  const normalizedScore = normalizeScore(score);
+  const activeRound =
+    normalizedScore.activeRound?.roundId === round.id
+      ? normalizedScore.activeRound
+      : createActiveScoreRound(round, finishedAt);
+
+  if (outcome === "revealed") {
+    const finishedRound: ScoreRound = {
+      ...activeRound,
+      status: "revealed",
+      outcome,
+      finishedAt,
+      points: 0,
+      basePoints: 0,
+      penalties: {
+        ...activeRound.penalties,
+        reveal: SCORE_RULES.revealPenalty
+      },
+      bonuses: zeroBonuses(),
+      badges: [],
+      grade: "Reveal",
+      summary: "Revealed cases do not award points or extend the streak."
+    };
+
+    return refreshScoreRank({
+      ...normalizedScore,
+      reveals: normalizedScore.reveals + 1,
+      currentStreak: 0,
+      activeRound: null,
+      lastRound: finishedRound,
+      recentRounds: addRecentRound(normalizedScore.recentRounds, finishedRound)
+    });
+  }
+
+  const nextStreak = normalizedScore.currentStreak + 1;
+  const bonuses = {
+    cleanRead: activeRound.mistakes === 0 ? SCORE_RULES.cleanReadBonus : 0,
+    noClue: activeRound.questions === 0 ? SCORE_RULES.noClueBonus : 0,
+    streak: Math.min(
+      SCORE_RULES.maxStreakBonus,
+      normalizedScore.currentStreak * SCORE_RULES.streakBonusStep
+    ),
+    comeback: activeRound.mistakes >= 2 ? SCORE_RULES.comebackBonus : 0
+  };
+  const penalties = {
+    wrongGuesses: activeRound.mistakes * SCORE_RULES.wrongGuessPenalty,
+    questions: activeRound.questions * SCORE_RULES.questionPenalty,
+    reveal: 0
+  };
+  const rawPoints =
+    SCORE_RULES.baseWin +
+    bonuses.cleanRead +
+    bonuses.noClue +
+    bonuses.streak +
+    bonuses.comeback -
+    penalties.wrongGuesses -
+    penalties.questions;
+  const points = Math.max(SCORE_RULES.minimumWinScore, rawPoints);
+  const badges = getRoundBadges({
+    wins: normalizedScore.wins,
+    mistakes: activeRound.mistakes,
+    questions: activeRound.questions,
+    outcome,
+    nextStreak
+  });
+  const finishedRound: ScoreRound = {
+    ...activeRound,
+    status: "won",
+    outcome,
+    finishedAt,
+    points,
+    basePoints: SCORE_RULES.baseWin,
+    penalties,
+    bonuses,
+    badges,
+    grade: getScoreGrade(points),
+    summary: getRoundScoreSummary(points, activeRound, outcome, nextStreak)
+  };
+  const totalPoints = normalizedScore.totalPoints + points;
+  const perfectRound =
+    activeRound.mistakes === 0 && activeRound.questions === 0;
+
+  return refreshScoreRank({
+    ...normalizedScore,
+    wins: normalizedScore.wins + 1,
+    totalPoints,
+    currentStreak: nextStreak,
+    bestStreak: Math.max(normalizedScore.bestStreak, nextStreak),
+    perfectRounds: normalizedScore.perfectRounds + (perfectRound ? 1 : 0),
+    activeRound: null,
+    lastRound: finishedRound,
+    recentRounds: addRecentRound(normalizedScore.recentRounds, finishedRound),
+    badges: mergeBadges(normalizedScore.badges, badges, finishedAt)
+  });
 }
 
 export function listTopics() {
@@ -726,6 +1054,249 @@ export function answerQuestion(
     }>,
     remainingCardIds: remainingCards.map((card) => card.id)
   };
+}
+
+function createActiveScoreRound(round: Round, startedAt: string): ScoreRound {
+  return {
+    roundId: round.id,
+    topic: round.topic,
+    status: "active",
+    outcome: "active",
+    startedAt,
+    finishedAt: null,
+    points: 0,
+    basePoints: SCORE_RULES.baseWin,
+    mistakes: 0,
+    questions: 0,
+    clearedTruths: 0,
+    penalties: zeroPenalties(),
+    bonuses: zeroBonuses(),
+    badges: [],
+    grade: "D",
+    summary: "Case in progress. Accuse carefully to protect your score."
+  };
+}
+
+function normalizeScoreRound(
+  round?: Partial<ScoreRound> | null
+): ScoreRound | null {
+  if (!round?.roundId) return null;
+
+  return {
+    roundId: String(round.roundId),
+    topic: String(round.topic ?? "Unknown topic"),
+    status:
+      round.status === "won" || round.status === "revealed"
+        ? round.status
+        : "active",
+    outcome:
+      round.outcome === "direct-win" ||
+      round.outcome === "elimination-win" ||
+      round.outcome === "revealed"
+        ? round.outcome
+        : "active",
+    startedAt: String(round.startedAt ?? new Date().toISOString()),
+    finishedAt: round.finishedAt ? String(round.finishedAt) : null,
+    points: asNumber(round.points),
+    basePoints: asNumber(round.basePoints),
+    mistakes: asNumber(round.mistakes),
+    questions: asNumber(round.questions),
+    clearedTruths: asNumber(round.clearedTruths),
+    penalties: {
+      wrongGuesses: asNumber(round.penalties?.wrongGuesses),
+      questions: asNumber(round.penalties?.questions),
+      reveal: asNumber(round.penalties?.reveal)
+    },
+    bonuses: {
+      cleanRead: asNumber(round.bonuses?.cleanRead),
+      noClue: asNumber(round.bonuses?.noClue),
+      streak: asNumber(round.bonuses?.streak),
+      comeback: asNumber(round.bonuses?.comeback)
+    },
+    badges: Array.isArray(round.badges)
+      ? round.badges.map(normalizeAwardedBadge).filter(isAwardedBadge)
+      : [],
+    grade: normalizeGrade(round.grade),
+    summary: String(
+      round.summary ??
+        "Case in progress. Accuse carefully to protect your score."
+    )
+  };
+}
+
+function normalizeScoreBadge(badge?: Partial<ScoreBadge> | null) {
+  if (!badge?.id || !(badge.id in BADGE_DEFINITIONS)) return null;
+
+  const definition = BADGE_DEFINITIONS[badge.id as ScoreBadgeId];
+  const earnedAt = String(
+    badge.lastEarnedAt ?? badge.firstEarnedAt ?? new Date().toISOString()
+  );
+
+  return {
+    ...definition,
+    count: Math.max(1, asNumber(badge.count) || 1),
+    firstEarnedAt: String(badge.firstEarnedAt ?? earnedAt),
+    lastEarnedAt: earnedAt
+  };
+}
+
+function normalizeAwardedBadge(
+  badge?: Partial<AwardedBadge> | null
+): AwardedBadge | null {
+  if (!badge?.id || !(badge.id in BADGE_DEFINITIONS)) return null;
+  return BADGE_DEFINITIONS[badge.id as ScoreBadgeId];
+}
+
+function isAwardedBadge(badge: AwardedBadge | null): badge is AwardedBadge {
+  return Boolean(badge);
+}
+
+function isScoreBadge(badge: ScoreBadge | null): badge is ScoreBadge {
+  return Boolean(badge);
+}
+
+function getRoundBadges(args: {
+  wins: number;
+  mistakes: number;
+  questions: number;
+  outcome: "direct-win" | "elimination-win";
+  nextStreak: number;
+}) {
+  const badgeIds: ScoreBadgeId[] = [];
+
+  if (args.wins === 0) badgeIds.push("first-case");
+  if (args.mistakes === 0) badgeIds.push("clean-read");
+  if (args.questions === 0) badgeIds.push("no-clue-needed");
+  if (args.mistakes === 0 && args.questions === 0) {
+    badgeIds.push("perfect-read");
+  }
+  if (args.mistakes >= 2) badgeIds.push("comeback-analyst");
+  if (args.outcome === "elimination-win") badgeIds.push("last-card-logic");
+  if (args.nextStreak >= 3) badgeIds.push("hot-streak");
+  if (args.questions >= 2) badgeIds.push("question-ledger");
+
+  return badgeIds.map((id) => BADGE_DEFINITIONS[id]);
+}
+
+function mergeBadges(
+  existingBadges: ScoreBadge[],
+  earnedBadges: AwardedBadge[],
+  earnedAt: string
+) {
+  const byId = new Map<ScoreBadgeId, ScoreBadge>();
+
+  for (const badge of existingBadges) {
+    byId.set(badge.id, normalizeScoreBadge(badge) ?? badge);
+  }
+
+  for (const badge of earnedBadges) {
+    const existing = byId.get(badge.id);
+    byId.set(badge.id, {
+      ...badge,
+      count: (existing?.count ?? 0) + 1,
+      firstEarnedAt: existing?.firstEarnedAt ?? earnedAt,
+      lastEarnedAt: earnedAt
+    });
+  }
+
+  return Array.from(byId.values());
+}
+
+function addRecentRound(recentRounds: ScoreRound[], round: ScoreRound) {
+  return [
+    round,
+    ...recentRounds.filter((item) => item.roundId !== round.roundId)
+  ].slice(0, SCORE_RULES.recentRoundLimit);
+}
+
+function zeroPenalties() {
+  return {
+    wrongGuesses: 0,
+    questions: 0,
+    reveal: 0
+  };
+}
+
+function zeroBonuses() {
+  return {
+    cleanRead: 0,
+    noClue: 0,
+    streak: 0,
+    comeback: 0
+  };
+}
+
+function getScoreGrade(points: number): ScoreRound["grade"] {
+  if (points >= 1400) return "S";
+  if (points >= 1000) return "A";
+  if (points >= 700) return "B";
+  if (points >= 400) return "C";
+  return "D";
+}
+
+function normalizeGrade(value: unknown): ScoreRound["grade"] {
+  return value === "S" ||
+    value === "A" ||
+    value === "B" ||
+    value === "C" ||
+    value === "D" ||
+    value === "Reveal"
+    ? value
+    : "D";
+}
+
+function getRoundScoreSummary(
+  points: number,
+  round: ScoreRound,
+  outcome: "direct-win" | "elimination-win",
+  streak: number
+) {
+  if (outcome === "elimination-win") {
+    return `Closed by elimination for ${points} points after clearing ${round.clearedTruths} truthful sources. Streak: ${streak}.`;
+  }
+
+  if (round.mistakes === 0 && round.questions === 0) {
+    return `Perfect read for ${points} points. No wrong guesses, no clues spent. Streak: ${streak}.`;
+  }
+
+  return `Case closed for ${points} points with ${round.mistakes} wrong guess${
+    round.mistakes === 1 ? "" : "es"
+  } and ${round.questions} clue question${
+    round.questions === 1 ? "" : "s"
+  }. Streak: ${streak}.`;
+}
+
+function getScoreRank(totalPoints: number): ScoreRank {
+  let current: (typeof SCORE_RANKS)[number] = SCORE_RANKS[0];
+  let next: (typeof SCORE_RANKS)[number] | undefined;
+
+  for (let index = 0; index < SCORE_RANKS.length; index += 1) {
+    const rank = SCORE_RANKS[index];
+    if (totalPoints >= rank.minPoints) {
+      current = rank;
+      next = SCORE_RANKS[index + 1];
+    }
+  }
+
+  return {
+    label: current.label,
+    minPoints: current.minPoints,
+    nextLabel: next?.label ?? null,
+    pointsToNext: next ? Math.max(0, next.minPoints - totalPoints) : null
+  };
+}
+
+function refreshScoreRank(score: GameScore): GameScore {
+  return {
+    ...score,
+    rank: getScoreRank(score.totalPoints)
+  };
+}
+
+function asNumber(value: unknown) {
+  return typeof value === "number" && Number.isFinite(value)
+    ? Math.max(0, Math.floor(value))
+    : 0;
 }
 
 function findTopicPack(requestedTopic: string | null) {

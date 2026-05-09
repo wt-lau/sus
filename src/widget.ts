@@ -1,366 +1,304 @@
-export const SUS_WIDGET_URI = "ui://widget/sus-source-cards-v5.html";
+export const SUS_WIDGET_URI = "ui://widget/sus-source-cards-v6.html";
 export const SUS_WIDGET_MIME_TYPE = "text/html;profile=mcp-app";
 
-export const SUS_WIDGET_HTML = `
-<!doctype html>
+export const SUS_WIDGET_HTML = `<!doctype html>
 <html lang="en">
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      rel="stylesheet"
+      href="https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,500;0,6..72,600;1,6..72,500;1,6..72,600&family=Inter:wght@400;450;500;600;700&display=swap"
+    />
     <style>
       :root {
-        color-scheme: light;
-        --paper: #f7f8f4;
-        --paper-deep: #dce7df;
-        --ink: #171918;
-        --muted: #66706d;
-        --line: #ccd7d3;
-        --panel: #ffffff;
-        --accent: #b3342a;
-        --accent-2: #0f766e;
-        --gold: #c89b2f;
-        --blue: #2f5f8a;
-        --shadow: 0 14px 34px rgba(17, 31, 29, 0.1);
-        font-family:
-          "Avenir Next", "Segoe UI", ui-sans-serif, system-ui, sans-serif;
+        color-scheme: light dark;
+
+        --surface-page: #faf8f3;
+        --surface-card: #ffffff;
+        --surface-subtle: #f1efe7;
+        --surface-sunken: #ebe8df;
+
+        --border-hairline: rgba(20, 20, 20, 0.08);
+        --border-soft: rgba(20, 20, 20, 0.12);
+        --border-firm: rgba(20, 20, 20, 0.22);
+
+        --ink-primary: #16181a;
+        --ink-secondary: #4a4a47;
+        --ink-tertiary: #7a766c;
+        --ink-inverse: #faf8f3;
+
+        --accent: #a8312f;
+        --accent-hover: #8c2825;
+        --accent-soft: rgba(168, 49, 47, 0.08);
+        --accent-strong: rgba(168, 49, 47, 0.18);
+
+        --truth: #2c6e49;
+        --truth-soft: rgba(44, 110, 73, 0.08);
+        --truth-border: rgba(44, 110, 73, 0.28);
+        --lie: #a8312f;
+        --lie-soft: rgba(168, 49, 47, 0.08);
+        --lie-border: rgba(168, 49, 47, 0.30);
+
+        --shadow-sm: 0 1px 2px rgba(20, 18, 14, 0.04);
+        --shadow-md: 0 4px 14px rgba(20, 18, 14, 0.06);
+        --shadow-lg: 0 12px 36px rgba(20, 18, 14, 0.10);
+        --shadow-card-hover: 0 6px 20px rgba(20, 18, 14, 0.08);
+
+        --radius-sm: 6px;
+        --radius-md: 10px;
+        --radius-lg: 14px;
+
+        --font-display: "Newsreader", "Iowan Old Style", "Palatino Linotype",
+          Georgia, serif;
+        --font-sans: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI",
+          Roboto, sans-serif;
+
+        font-family: var(--font-sans);
+        font-feature-settings: "ss01", "cv11";
+        color: var(--ink-primary);
+        background: var(--surface-page);
+        -webkit-font-smoothing: antialiased;
+        -moz-osx-font-smoothing: grayscale;
       }
 
-      * {
+      @media (prefers-color-scheme: dark) {
+        :root {
+          --surface-page: #131316;
+          --surface-card: #1d1d22;
+          --surface-subtle: #1a1a1e;
+          --surface-sunken: #101013;
+
+          --border-hairline: rgba(255, 255, 255, 0.06);
+          --border-soft: rgba(255, 255, 255, 0.10);
+          --border-firm: rgba(255, 255, 255, 0.18);
+
+          --ink-primary: #f3f1ec;
+          --ink-secondary: #b6b2a8;
+          --ink-tertiary: #84807a;
+          --ink-inverse: #131316;
+
+          --accent: #ec605c;
+          --accent-hover: #f3766f;
+          --accent-soft: rgba(236, 96, 92, 0.10);
+          --accent-strong: rgba(236, 96, 92, 0.20);
+
+          --truth: #74c69d;
+          --truth-soft: rgba(116, 198, 157, 0.10);
+          --truth-border: rgba(116, 198, 157, 0.30);
+          --lie: #ec605c;
+          --lie-soft: rgba(236, 96, 92, 0.10);
+          --lie-border: rgba(236, 96, 92, 0.30);
+        }
+      }
+
+      *,
+      *::before,
+      *::after {
         box-sizing: border-box;
       }
 
       body {
-        background:
-          linear-gradient(rgba(23, 25, 24, 0.035) 1px, transparent 1px),
-          linear-gradient(90deg, rgba(23, 25, 24, 0.03) 1px, transparent 1px),
-          linear-gradient(135deg, #fafbf7 0%, var(--paper) 48%, #edf3f5 100%);
-        background-size: 22px 22px, 22px 22px, auto;
-        color: var(--ink);
         margin: 0;
-      }
-
-      button,
-      input {
-        font: inherit;
-      }
-
-      button {
-        align-items: center;
-        background: var(--ink);
-        border: 1px solid var(--ink);
-        border-radius: 6px;
-        color: #fbfffb;
-        cursor: pointer;
-        display: inline-flex;
-        font-weight: 780;
-        gap: 8px;
-        justify-content: center;
-        min-height: 40px;
-        padding: 9px 13px;
-      }
-
-      button.secondary {
-        background: rgba(255, 255, 255, 0.74);
-        color: var(--ink);
-      }
-
-      button.ghost {
-        background: transparent;
-        border-color: transparent;
-        color: var(--muted);
-        min-height: 34px;
-        padding-inline: 6px;
-      }
-
-      button:disabled {
-        cursor: not-allowed;
-        opacity: 0.48;
-      }
-
-      input {
-        background: #fbfffb;
-        border: 1px solid var(--line);
-        border-radius: 6px;
-        color: var(--ink);
-        min-height: 42px;
-        outline: none;
-        padding: 10px 12px;
-        width: 100%;
-      }
-
-      input:focus {
-        border-color: var(--accent-2);
-        box-shadow: 0 0 0 3px rgba(45, 111, 104, 0.14);
-      }
-
-      a {
-        color: var(--blue);
+        background: var(--surface-page);
+        color: var(--ink-primary);
+        font-family: var(--font-sans);
+        font-size: 15px;
+        line-height: 1.55;
       }
 
       h1,
       h2,
       h3,
+      h4,
       p {
         margin: 0;
       }
 
-      h1,
-      h2 {
-        font-family:
-          "Iowan Old Style", "Palatino Linotype", Georgia, serif;
-        font-weight: 620;
-        letter-spacing: 0;
-        text-wrap: pretty;
+      button {
+        font: inherit;
+        cursor: pointer;
+        border: 1px solid transparent;
+        border-radius: var(--radius-sm);
+        padding: 11px 18px;
+        background: var(--ink-primary);
+        color: var(--ink-inverse);
+        font-weight: 500;
+        letter-spacing: -0.005em;
+        transition: background 140ms ease, border-color 140ms ease,
+          color 140ms ease, transform 140ms ease;
+        text-align: center;
+        white-space: nowrap;
       }
 
-      h1 {
-        font-size: clamp(30px, 6vw, 56px);
-        line-height: 1;
+      button:hover {
+        background: var(--ink-secondary);
       }
 
-      h2 {
-        font-size: 21px;
-        line-height: 1.12;
+      button:focus-visible {
+        outline: 2px solid var(--accent);
+        outline-offset: 2px;
       }
 
-      h3 {
-        font-size: 14px;
-        letter-spacing: 0.08em;
-        line-height: 1.2;
-        text-transform: uppercase;
+      button:disabled {
+        cursor: not-allowed;
+        opacity: 0.5;
       }
 
-      .shell {
-        display: grid;
-        gap: 16px;
-        margin: 0 auto;
-        max-width: 1120px;
-        min-height: 100%;
-        padding: 18px;
+      .btn-secondary {
+        background: var(--surface-card);
+        color: var(--ink-primary);
+        border-color: var(--border-firm);
       }
 
-      .welcome {
-        align-items: stretch;
-        display: grid;
-        gap: 16px;
-        grid-template-columns: minmax(320px, 0.72fr) minmax(0, 1fr);
+      .btn-secondary:hover {
+        background: var(--surface-subtle);
+        border-color: var(--ink-primary);
       }
 
-      .hero,
-      .case-panel,
-      .topbar,
-      .focus-strip,
-      .question,
-      .answer,
-      .summary {
-        background: rgba(255, 255, 255, 0.9);
-        border: 1px solid rgba(204, 215, 211, 0.88);
-        border-radius: 8px;
-        box-shadow: var(--shadow);
-      }
-
-      .hero {
-        min-height: 430px;
-        overflow: hidden;
-        padding: 30px;
-        position: relative;
-      }
-
-      .hero::before,
-      .hero::after {
-        content: "";
-        position: absolute;
-        pointer-events: none;
-      }
-
-      .hero::before {
-        background:
-          linear-gradient(90deg, transparent 0 42%, rgba(179, 52, 42, 0.22) 42% 43%, transparent 43%),
-          linear-gradient(17deg, transparent 0 58%, rgba(15, 118, 110, 0.2) 58% 59%, transparent 59%);
-        inset: 0;
-        opacity: 0.55;
-      }
-
-      .hero::after {
-        background:
-          linear-gradient(90deg, transparent 0 28%, rgba(23, 25, 24, 0.08) 28% 29%, transparent 29%),
-          linear-gradient(0deg, transparent 0 34%, rgba(23, 25, 24, 0.07) 34% 35%, transparent 35%);
-        bottom: 26px;
-        height: 120px;
-        right: 30px;
-        width: 220px;
-      }
-
-      .hero-content {
-        display: grid;
-        gap: 24px;
-        max-width: 620px;
-        position: relative;
-        z-index: 1;
-      }
-
-      .case-mark {
-        align-items: center;
-        background: #fbfffb;
-        border: 1px solid rgba(23, 25, 24, 0.14);
-        border-radius: 8px;
-        display: inline-flex;
-        height: 72px;
-        justify-content: center;
-        overflow: hidden;
-        position: relative;
-        width: 72px;
-      }
-
-      .case-mark img {
-        display: block;
-        height: 100%;
-        object-fit: cover;
-        width: 100%;
-      }
-
-      .eyebrow {
-        color: var(--accent);
-        font-size: 12px;
-        font-weight: 850;
-        letter-spacing: 0.12em;
-        text-transform: uppercase;
-      }
-
-      .lede {
-        color: #35322c;
-        font-size: 18px;
-        line-height: 1.55;
-        max-width: 560px;
-      }
-
-      .intro-flow {
-        display: grid;
-        gap: 8px;
-        grid-template-columns: repeat(3, minmax(0, 1fr));
-      }
-
-      .step {
-        background: rgba(255, 255, 255, 0.76);
-        border: 1px solid rgba(204, 215, 211, 0.86);
-        border-radius: 8px;
-        display: grid;
-        gap: 5px;
-        min-height: 92px;
-        padding: 11px;
-      }
-
-      .step strong {
-        font-size: 12px;
-        letter-spacing: 0.08em;
-        text-transform: uppercase;
-      }
-
-      .step span {
-        color: #3b4542;
-        font-size: 13px;
-        line-height: 1.35;
-      }
-
-      .case-stack {
-        bottom: 28px;
-        display: grid;
-        gap: 9px;
-        left: 30px;
-        max-width: 520px;
-        position: absolute;
-        right: 30px;
-        z-index: 1;
-      }
-
-      .file-strip {
-        align-items: center;
-        background: rgba(255, 255, 255, 0.82);
-        border: 1px solid rgba(204, 215, 211, 0.86);
-        border-radius: 7px;
-        display: grid;
-        gap: 10px;
-        grid-template-columns: 34px minmax(0, 1fr) auto;
-        min-height: 52px;
-        padding: 9px 11px;
-      }
-
-      .file-strip:nth-child(2) {
-        transform: translateX(20px);
-      }
-
-      .file-strip:nth-child(3) {
-        transform: translateX(8px);
-      }
-
-      .file-id {
-        align-items: center;
-        border: 1px solid var(--line);
+      .btn-pill {
+        background: var(--surface-card);
+        color: var(--ink-secondary);
+        border: 1px solid var(--border-soft);
         border-radius: 999px;
-        color: var(--accent-2);
-        display: flex;
-        font-size: 12px;
-        font-weight: 900;
-        height: 32px;
-        justify-content: center;
-        width: 32px;
-      }
-
-      .file-title {
+        padding: 6px 13px;
         font-size: 13px;
-        font-weight: 760;
-        min-width: 0;
+        font-weight: 450;
       }
 
-      .file-rule {
-        background: currentColor;
-        color: rgba(23, 25, 24, 0.26);
-        height: 1px;
-        width: 56px;
+      .btn-pill:hover {
+        border-color: var(--ink-primary);
+        color: var(--ink-primary);
+        background: var(--surface-card);
       }
 
-      .case-panel {
-        align-content: start;
+      input {
+        font: inherit;
+        background: var(--surface-card);
+        border: 1px solid var(--border-soft);
+        border-radius: var(--radius-sm);
+        padding: 11px 14px;
+        color: var(--ink-primary);
+        width: 100%;
+        outline: none;
+        transition: border-color 140ms ease, box-shadow 140ms ease;
+      }
+
+      input::placeholder {
+        color: var(--ink-tertiary);
+      }
+
+      input:focus {
+        border-color: var(--ink-primary);
+        box-shadow: 0 0 0 3px var(--accent-soft);
+      }
+
+      a {
+        color: var(--accent);
+        text-decoration: none;
+      }
+
+      a:hover {
+        text-decoration: underline;
+      }
+
+      /* Layout shell */
+      .shell {
+        max-width: 980px;
+        margin: 0 auto;
+        padding: 24px;
         display: grid;
         gap: 22px;
-        min-height: 430px;
-        padding: 22px;
       }
 
-      .case-panel-header {
+      .shell-welcome {
+        padding: 36px 24px 48px;
+      }
+
+      .kicker {
+        font-size: 11px;
+        font-weight: 600;
+        letter-spacing: 0.16em;
+        text-transform: uppercase;
+        color: var(--ink-tertiary);
+      }
+
+      .kicker-accent {
+        color: var(--accent);
+      }
+
+      .form-label {
+        font-size: 11px;
+        font-weight: 600;
+        letter-spacing: 0.10em;
+        text-transform: uppercase;
+        color: var(--ink-tertiary);
+      }
+
+      .error {
+        background: var(--lie-soft);
+        border: 1px solid var(--lie-border);
+        color: var(--lie);
+        border-radius: var(--radius-sm);
+        padding: 10px 14px;
+        font-size: 13px;
+        line-height: 1.5;
+      }
+
+      /* Welcome */
+      .welcome {
         display: grid;
-        gap: 8px;
+        gap: 36px;
+        max-width: 640px;
+        margin: 0 auto;
       }
 
-      .panel-heading {
-        align-items: center;
+      .welcome-mark {
         display: flex;
+        align-items: center;
         gap: 12px;
       }
 
-      .panel-icon {
-        background: #fbfffb;
-        border: 1px solid rgba(204, 215, 211, 0.9);
-        border-radius: 8px;
+      .brand-mark {
+        width: 44px;
+        height: 44px;
+        border-radius: 10px;
+        overflow: hidden;
+        background: var(--surface-card);
+        border: 1px solid var(--border-soft);
+        flex-shrink: 0;
+      }
+
+      .brand-mark img {
+        width: 100%;
+        height: 100%;
+        object-fit: contain;
         display: block;
-        height: 48px;
-        object-fit: cover;
-        width: 48px;
       }
 
-      .muted {
-        color: var(--muted);
+      .welcome-hero h1 {
+        font-family: var(--font-display);
+        font-weight: 500;
+        font-size: clamp(36px, 6vw, 56px);
+        line-height: 1.04;
+        letter-spacing: -0.022em;
+        margin-bottom: 18px;
+        text-wrap: balance;
       }
 
-      .message {
-        color: #3c3831;
-        line-height: 1.48;
+      .welcome-hero h1 em {
+        color: var(--accent);
+        font-style: italic;
+        font-weight: 500;
       }
 
-      .microcopy {
-        color: var(--muted);
-        font-size: 12px;
-        line-height: 1.38;
+      .welcome-hero .lede {
+        color: var(--ink-secondary);
+        font-size: 17px;
+        line-height: 1.55;
+        max-width: 560px;
       }
 
       .topic-form {
@@ -368,509 +306,842 @@ export const SUS_WIDGET_HTML = `
         gap: 10px;
       }
 
-      .topic-actions {
+      .form-row {
         display: grid;
+        grid-template-columns: minmax(0, 1fr) auto;
         gap: 8px;
-        grid-template-columns: 1fr;
+      }
+
+      .form-row input {
+        font-size: 16px;
+        padding: 13px 16px;
+      }
+
+      .form-row button {
+        padding: 13px 22px;
+      }
+
+      .suggestions-block {
+        display: grid;
+        gap: 10px;
       }
 
       .suggestions {
         display: flex;
         flex-wrap: wrap;
+        gap: 6px;
+      }
+
+      .how-it-works {
+        border-top: 1px solid var(--border-hairline);
+        padding-top: 28px;
+      }
+
+      .steps {
+        display: grid;
+        gap: 16px;
+        margin: 0;
+        padding: 0;
+        list-style: none;
+        counter-reset: step;
+      }
+
+      .steps li {
+        display: grid;
+        grid-template-columns: 30px minmax(0, 1fr);
+        gap: 14px;
+        align-items: baseline;
+        counter-increment: step;
+      }
+
+      .steps li::before {
+        content: counter(step, decimal-leading-zero);
+        font-family: var(--font-display);
+        font-size: 14px;
+        font-weight: 500;
+        color: var(--accent);
+        font-feature-settings: "tnum", "lnum";
+        line-height: 1.4;
+      }
+
+      .steps strong {
+        font-weight: 600;
+        color: var(--ink-primary);
+        margin-right: 6px;
+      }
+
+      .steps span {
+        color: var(--ink-secondary);
+        font-size: 14px;
+        line-height: 1.55;
+      }
+
+      /* Round header */
+      .round-header {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) auto;
+        gap: 24px;
+        align-items: start;
+        padding-bottom: 20px;
+        border-bottom: 1px solid var(--border-hairline);
+      }
+
+      .round-context {
+        display: grid;
         gap: 8px;
+        min-width: 0;
       }
 
-      .suggestion {
-        background: #fbfffb;
-        border: 1px solid var(--line);
-        border-radius: 999px;
-        color: #38352f;
-        min-height: 32px;
-        padding: 6px 10px;
+      .round-topic {
+        font-family: var(--font-display);
+        font-weight: 500;
+        font-size: clamp(28px, 4vw, 42px);
+        line-height: 1.08;
+        letter-spacing: -0.022em;
+        text-wrap: balance;
+        margin-top: 2px;
       }
 
-      .dossier-label {
-        color: var(--muted);
-        font-size: 12px;
-        font-weight: 800;
+      .round-message {
+        color: var(--ink-secondary);
+        font-size: 14px;
+        line-height: 1.55;
+        max-width: 640px;
+      }
+
+      .round-actions {
+        display: flex;
+        gap: 8px;
+        flex-shrink: 0;
+      }
+
+      .round-actions button {
+        padding: 9px 16px;
+        font-size: 14px;
+      }
+
+      /* Round meta */
+      .round-meta {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 28px;
+        align-items: baseline;
+      }
+
+      .meta-stat {
+        color: var(--ink-tertiary);
+        font-size: 13px;
+        font-feature-settings: "tnum";
+      }
+
+      .meta-stat strong {
+        color: var(--ink-primary);
+        font-family: var(--font-display);
+        font-size: 20px;
+        font-weight: 500;
+        margin-right: 7px;
+        font-feature-settings: "tnum", "lnum";
+      }
+
+      .meta-stat.phase {
+        margin-left: auto;
+        color: var(--accent);
+        font-weight: 600;
+        font-size: 11px;
+        letter-spacing: 0.10em;
         text-transform: uppercase;
       }
 
-      .error {
-        background: #fff0eb;
-        border: 1px solid #e6b7a6;
-        border-radius: 7px;
-        color: #7a2a17;
-        line-height: 1.42;
-        padding: 10px 12px;
-      }
-
-      .topbar {
-        display: grid;
-        gap: 12px;
+      .score-panel {
+        background: var(--surface-card);
+        border: 1px solid var(--border-soft);
+        border-radius: var(--radius-md);
         padding: 16px;
-      }
-
-      .heading {
-        align-items: start;
-        display: flex;
-        gap: 14px;
-        justify-content: space-between;
-      }
-
-      .round-title {
         display: grid;
-        gap: 6px;
-      }
-
-      .round-title h1 {
-        font-size: clamp(28px, 5vw, 48px);
-      }
-
-      .status {
-        border: 1px solid rgba(23, 25, 24, 0.1);
-        border-radius: 999px;
-        display: inline-flex;
-        font-size: 12px;
-        font-weight: 850;
-        padding: 6px 9px;
-        white-space: nowrap;
-      }
-
-      .status.active,
-      .status.question-answered {
-        background: #e5f0ee;
-        color: #1f5f58;
-      }
-
-      .status.welcome {
-        background: #f5e7be;
-        color: #6b5010;
-      }
-
-      .status.won {
-        background: #e4f2da;
-        color: #2f6425;
-      }
-
-      .status.revealed,
-      .status.truth-cleared,
-      .status.question-required {
-        background: #f8dfd7;
-        color: #7b2b15;
-      }
-
-      .toolbar {
-        display: flex;
-        flex-wrap: wrap;
-        gap: 8px;
-      }
-
-      .scorebar {
-        color: var(--muted);
-        display: flex;
-        flex-wrap: wrap;
-        font-size: 13px;
-        gap: 12px;
-      }
-
-      .phase-line {
-        display: flex;
-        flex-wrap: wrap;
-        gap: 8px;
-      }
-
-      .phase-chip {
+        grid-template-columns: minmax(0, 1fr) auto;
+        gap: 16px;
         align-items: center;
-        background: #f4f8f6;
-        border: 1px solid var(--line);
-        border-radius: 999px;
-        color: #34423f;
-        display: inline-flex;
-        font-size: 12px;
-        font-weight: 780;
-        gap: 6px;
-        padding: 6px 9px;
       }
 
-      .phase-chip.current {
-        background: #e5f0ee;
-        border-color: #9ec8c2;
-        color: #145d55;
-      }
-
-      .focus-strip {
-        display: grid;
-        gap: 10px;
-        grid-template-columns: minmax(190px, 0.55fr) minmax(0, 1fr);
+      .score-panel.compact {
+        grid-template-columns: 1fr;
         padding: 14px 16px;
       }
 
-      .lens-list {
+      .score-main {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 18px;
+        align-items: baseline;
+      }
+
+      .score-stat {
         display: grid;
-        gap: 8px;
-        grid-template-columns: repeat(4, minmax(0, 1fr));
+        gap: 2px;
+        min-width: 72px;
       }
 
-      .lens {
-        border-left: 2px solid var(--accent-2);
-        color: #34423f;
-        font-size: 12px;
-        line-height: 1.35;
-        padding-left: 9px;
+      .score-value {
+        font-family: var(--font-display);
+        font-size: 28px;
+        font-weight: 500;
+        line-height: 1;
+        font-feature-settings: "tnum", "lnum";
       }
 
-      .asset-panel {
-        background: rgba(255, 255, 255, 0.86);
-        border: 1px solid rgba(204, 215, 211, 0.88);
-        border-radius: 8px;
-        box-shadow: var(--shadow);
+      .score-label {
+        color: var(--ink-tertiary);
+        font-size: 11px;
+        font-weight: 600;
+        letter-spacing: 0.10em;
+        text-transform: uppercase;
+      }
+
+      .score-rank {
         display: grid;
-        gap: 10px;
-        padding: 12px;
+        gap: 4px;
+        justify-items: end;
+        text-align: right;
       }
 
-      .asset-preview {
-        align-items: center;
-        display: grid;
-        gap: 12px;
-        grid-template-columns: 96px minmax(0, 1fr);
+      .rank-label {
+        color: var(--ink-primary);
+        font-size: 13px;
+        font-weight: 600;
       }
 
-      .asset-image {
-        aspect-ratio: 1;
-        background:
-          linear-gradient(135deg, rgba(15, 118, 110, 0.14), rgba(179, 52, 42, 0.08)),
-          #eef4f1;
-        border: 1px solid var(--line);
-        border-radius: 7px;
-        object-fit: cover;
-        width: 100%;
-      }
-
-      .asset-copy {
-        align-content: start;
-        display: grid;
-        gap: 8px;
-      }
-
-      .asset-form {
-        display: grid;
-        gap: 8px;
-        grid-template-columns: minmax(0, 1fr) auto;
-      }
-
-      .asset-meta {
-        color: var(--muted);
+      .rank-progress {
+        color: var(--ink-tertiary);
         font-size: 12px;
         line-height: 1.4;
-        overflow-wrap: anywhere;
       }
 
-      .cards {
+      .score-note {
+        color: var(--ink-secondary);
+        font-size: 13px;
+        grid-column: 1 / -1;
+        line-height: 1.5;
+      }
+
+      .badge-list {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 6px;
+        grid-column: 1 / -1;
+      }
+
+      .badge {
+        background: var(--accent-soft);
+        border: 1px solid var(--accent-strong);
+        border-radius: 999px;
+        color: var(--accent);
+        font-size: 11px;
+        font-weight: 600;
+        letter-spacing: 0.08em;
+        padding: 5px 9px;
+        text-transform: uppercase;
+      }
+
+      /* Cards */
+      .cards-grid {
         display: grid;
-        gap: 10px;
-        grid-template-columns: repeat(auto-fit, minmax(202px, 1fr));
+        grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+        gap: 12px;
       }
 
       .card {
+        position: relative;
+        perspective: 1400px;
         background: transparent;
         border: 0;
-        display: block;
-        min-height: 342px;
         padding: 0;
-        perspective: 1200px;
-        position: relative;
+        text-align: left;
+        display: block;
+        min-height: 320px;
       }
 
       .card.selectable {
         cursor: pointer;
       }
 
-      .card.selectable:hover .card-face,
-      .card.selectable:focus .card-face {
-        border-color: var(--accent-2);
-        box-shadow:
-          0 0 0 3px rgba(45, 111, 104, 0.12),
-          0 18px 36px rgba(38, 30, 19, 0.14);
-        outline: none;
-      }
-
-      .card-shell {
-        height: 100%;
-        min-height: 342px;
+      .card-inner {
         position: relative;
+        width: 100%;
+        min-height: 320px;
         transform-style: preserve-3d;
-        transition: transform 380ms ease;
+        transition: transform 520ms cubic-bezier(0.4, 0, 0.2, 1);
       }
 
-      .card.selectable:hover .card-shell,
-      .card.selectable:focus .card-shell {
-        transform: translateY(-2px);
-      }
-
-      .card.flipped .card-shell {
+      .card.flipped .card-inner {
         transform: rotateY(180deg);
-      }
-
-      .card.selectable:hover.flipped .card-shell,
-      .card.selectable:focus.flipped .card-shell {
-        transform: rotateY(180deg) translateY(-2px);
       }
 
       .card-face {
-        backface-visibility: hidden;
-        background: rgba(255, 255, 255, 0.96);
-        border: 1px solid var(--line);
-        border-radius: 8px;
-        box-shadow: 0 14px 32px rgba(38, 30, 19, 0.08);
+        background: var(--surface-card);
+        border: 1px solid var(--border-soft);
+        border-radius: var(--radius-md);
+        padding: 18px;
         display: grid;
-        gap: 10px;
-        min-height: 342px;
-        padding: 13px;
+        grid-template-rows: auto 1fr auto;
+        gap: 14px;
+        backface-visibility: hidden;
+        -webkit-backface-visibility: hidden;
+        min-height: 320px;
+        transition: border-color 200ms ease, box-shadow 200ms ease,
+          transform 200ms ease;
       }
 
       .card-back {
-        inset: 0;
         position: absolute;
+        inset: 0;
         transform: rotateY(180deg);
       }
 
-      .card.cleared .card-face {
-        background: #f0ece3;
-        color: #777066;
-      }
-
-      .card.truth .card-face,
-      .card.cleared .card-back {
-        background: #eef7ed;
-        border-color: #a8d0a6;
+      .card.selectable:hover .card-face,
+      .card.selectable:focus-visible .card-face {
+        border-color: var(--ink-primary);
+        box-shadow: var(--shadow-card-hover);
+        transform: translateY(-2px);
       }
 
       .card.lie .card-face {
-        background: #fff0e9;
-        border-color: #edab95;
+        border-color: var(--lie-border);
+        background: linear-gradient(
+          180deg,
+          var(--surface-card),
+          var(--lie-soft)
+        );
+      }
+
+      .card.truth .card-face,
+      .card.cleared .card-face {
+        border-color: var(--truth-border);
+        background: linear-gradient(
+          180deg,
+          var(--surface-card),
+          var(--truth-soft)
+        );
+      }
+
+      .card.cleared:not(.flipped) .card-face {
+        opacity: 0.62;
       }
 
       .card-top {
-        align-items: center;
         display: flex;
-        gap: 8px;
+        align-items: center;
         justify-content: space-between;
+        gap: 8px;
       }
 
       .card-id {
-        align-items: center;
-        background: #f4da90;
-        border-radius: 999px;
-        color: var(--ink);
-        display: inline-flex;
-        font-size: 12px;
-        font-weight: 900;
-        height: 30px;
-        justify-content: center;
-        width: 30px;
+        font-family: var(--font-display);
+        font-weight: 500;
+        font-size: 24px;
+        line-height: 1;
+        color: var(--ink-primary);
+        font-feature-settings: "tnum";
       }
 
-      .card-state {
-        color: var(--muted);
-        font-size: 11px;
-        font-weight: 850;
-        letter-spacing: 0.08em;
-        text-transform: uppercase;
-      }
-
-      .meta,
-      .claim,
-      .excerpt,
-      .signal,
-      .reveal-list,
-      .clue-list,
-      .citation-list {
-        font-size: 13px;
-        line-height: 1.4;
-      }
-
-      .meta {
-        color: var(--muted);
-      }
-
-      .claim {
-        font-weight: 760;
-      }
-
-      .field-label {
-        color: var(--muted);
-        display: block;
+      .card-status-tag {
         font-size: 10px;
-        font-weight: 850;
-        letter-spacing: 0.08em;
-        margin-bottom: 4px;
+        font-weight: 600;
+        letter-spacing: 0.12em;
         text-transform: uppercase;
+        color: var(--ink-tertiary);
       }
 
-      .excerpt {
-        color: #49453e;
+      .card.lie .card-status-tag {
+        color: var(--lie);
       }
 
-      .signal {
-        border-top: 1px solid rgba(213, 200, 179, 0.76);
-        color: #625c50;
+      .card.truth .card-status-tag,
+      .card.cleared .card-status-tag {
+        color: var(--truth);
+      }
+
+      .card-body {
+        display: grid;
+        gap: 8px;
+        min-width: 0;
+      }
+
+      .card-source {
+        font-size: 11px;
+        font-weight: 500;
+        color: var(--ink-tertiary);
+        letter-spacing: 0.02em;
+        line-height: 1.45;
+        overflow-wrap: anywhere;
+      }
+
+      .card-headline {
+        font-family: var(--font-display);
+        font-weight: 500;
+        font-size: 17px;
+        line-height: 1.25;
+        color: var(--ink-primary);
+        letter-spacing: -0.011em;
+        text-wrap: balance;
+      }
+
+      .card-claim {
+        font-size: 13px;
+        line-height: 1.5;
+        color: var(--ink-secondary);
+      }
+
+      .card-evidence {
+        font-size: 12px;
+        line-height: 1.5;
+        color: var(--ink-tertiary);
+        border-top: 1px solid var(--border-hairline);
         padding-top: 10px;
       }
 
-      .card-footer {
-        align-self: end;
-        color: var(--accent-2);
+      .card-bottom {
         display: flex;
-        flex-wrap: wrap;
-        font-size: 12px;
-        font-weight: 860;
-        gap: 8px;
         justify-content: space-between;
-        letter-spacing: 0.08em;
+        align-items: center;
+        gap: 8px;
+      }
+
+      .card-cta {
+        font-size: 11px;
+        font-weight: 600;
+        letter-spacing: 0.10em;
+        text-transform: uppercase;
+        color: var(--accent);
+      }
+
+      .card.selectable:not(.flipped) .card-face .card-cta::after {
+        content: " →";
+        margin-left: 2px;
+      }
+
+      .card:not(.selectable) .card-cta {
+        color: var(--ink-tertiary);
+      }
+
+      .card-link {
+        background: transparent;
+        color: var(--ink-tertiary);
+        border: 1px solid var(--border-soft);
+        border-radius: 999px;
+        padding: 4px 10px;
+        font-size: 11px;
+        font-weight: 500;
+        text-transform: none;
+        letter-spacing: 0;
+      }
+
+      .card-link:hover {
+        color: var(--ink-primary);
+        border-color: var(--ink-primary);
+        background: var(--surface-card);
+      }
+
+      .card-back-body {
+        display: grid;
+        gap: 10px;
+        min-width: 0;
+      }
+
+      .card-back-title {
+        font-family: var(--font-display);
+        font-weight: 500;
+        font-size: 19px;
+        line-height: 1.2;
+        letter-spacing: -0.011em;
+      }
+
+      .card.lie .card-back-title {
+        color: var(--lie);
+      }
+
+      .card.truth .card-back-title,
+      .card.cleared .card-back-title {
+        color: var(--truth);
+      }
+
+      .card-back-text {
+        font-size: 13px;
+        line-height: 1.55;
+        color: var(--ink-secondary);
+      }
+
+      /* Panels (question + answer) */
+      .panel {
+        background: var(--surface-card);
+        border: 1px solid var(--border-soft);
+        border-radius: var(--radius-md);
+        padding: 20px;
+        display: grid;
+        gap: 14px;
+      }
+
+      .panel.accent {
+        background: linear-gradient(
+          180deg,
+          var(--surface-card),
+          var(--accent-soft)
+        );
+        border-color: var(--accent-strong);
+      }
+
+      .panel-header {
+        display: flex;
+        align-items: baseline;
+        justify-content: space-between;
+        gap: 12px;
+      }
+
+      .panel-title {
+        font-family: var(--font-display);
+        font-size: 20px;
+        font-weight: 500;
+        line-height: 1.2;
+        letter-spacing: -0.012em;
+      }
+
+      .panel-pill {
+        font-size: 11px;
+        font-weight: 600;
+        letter-spacing: 0.10em;
+        color: var(--ink-tertiary);
         text-transform: uppercase;
       }
 
-      .source-link {
-        border-color: rgba(37, 76, 115, 0.28);
-        color: var(--blue);
-        min-height: 28px;
-        padding: 4px 8px;
-        text-decoration: none;
-        text-transform: none;
+      .panel-body {
+        color: var(--ink-secondary);
+        font-size: 14px;
+        line-height: 1.6;
       }
 
-      .question,
-      .answer,
-      .summary {
-        display: grid;
-        gap: 12px;
-        padding: 16px;
-      }
-
-      .answer-top {
-        align-items: center;
+      .clue-presets {
         display: flex;
-        gap: 8px;
-        justify-content: space-between;
+        flex-wrap: wrap;
+        gap: 6px;
       }
 
-      .source-pill {
-        background: #edf4f7;
-        border: 1px solid #c6dbe3;
-        border-radius: 999px;
-        color: #1d4655;
-        font-size: 12px;
-        font-weight: 850;
-        padding: 4px 8px;
-      }
-
-      .question-row {
-        display: grid;
-        gap: 8px;
-        grid-template-columns: minmax(0, 1fr) auto;
-      }
-
-      .clue-list,
       .citation-list,
-      .reveal-list {
+      .clue-list {
         display: grid;
         gap: 8px;
       }
 
-      .clue,
       .citation,
-      .reveal-card {
-        background: rgba(255, 253, 248, 0.74);
-        border: 1px solid rgba(213, 200, 179, 0.74);
-        border-radius: 7px;
-        padding: 10px 12px;
+      .clue {
+        background: var(--surface-subtle);
+        border-radius: var(--radius-sm);
+        padding: 11px 13px;
+        font-size: 13px;
+        line-height: 1.5;
       }
 
       .citation a {
-        color: var(--accent-2);
-        font-weight: 760;
+        color: var(--ink-primary);
+        font-weight: 500;
         overflow-wrap: anywhere;
-        text-decoration: none;
       }
 
       .citation a:hover {
-        text-decoration: underline;
+        color: var(--accent);
       }
 
-      .summary-grid {
+      .citation-meta {
+        color: var(--ink-tertiary);
+        font-size: 12px;
+        margin-top: 4px;
+      }
+
+      .clue strong {
+        font-family: var(--font-display);
+        font-weight: 500;
+        color: var(--ink-primary);
+        font-size: 14px;
+      }
+
+      /* Asset panel */
+      .asset-panel {
+        background: var(--surface-subtle);
+        border: 1px dashed var(--border-soft);
+        border-radius: var(--radius-md);
+        padding: 14px;
         display: grid;
-        gap: 12px;
-        grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.1fr);
+        grid-template-columns: 88px minmax(0, 1fr);
+        gap: 14px;
+        align-items: start;
+      }
+
+      .asset-image {
+        width: 88px;
+        height: 88px;
+        border-radius: var(--radius-sm);
+        background: var(--surface-card);
+        border: 1px solid var(--border-soft);
+        object-fit: cover;
+      }
+
+      .asset-image.placeholder {
+        background: linear-gradient(
+          135deg,
+          var(--accent-soft),
+          var(--surface-card) 70%
+        );
+      }
+
+      .asset-content {
+        display: grid;
+        gap: 8px;
+        min-width: 0;
+      }
+
+      .asset-prompt-text {
+        color: var(--ink-secondary);
+        font-size: 13px;
+        line-height: 1.5;
+      }
+
+      .asset-form {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) auto;
+        gap: 6px;
+        margin-top: 2px;
+      }
+
+      .asset-form input {
+        font-size: 13px;
+        padding: 9px 12px;
+      }
+
+      .asset-form button {
+        padding: 9px 14px;
+        font-size: 13px;
+      }
+
+      .asset-meta {
+        color: var(--ink-tertiary);
+        font-size: 11px;
+        font-feature-settings: "tnum";
+      }
+
+      /* Summary */
+      .summary {
+        display: grid;
+        gap: 28px;
       }
 
       .summary-hero {
-        border: 1px solid var(--line);
-        border-radius: 8px;
         display: grid;
-        gap: 12px;
-        padding: 16px;
+        gap: 14px;
+        padding-bottom: 24px;
+        border-bottom: 1px solid var(--border-hairline);
       }
 
-      @media (max-width: 980px) {
-        .welcome,
-        .focus-strip,
-        .summary-grid {
-          grid-template-columns: 1fr;
-        }
-
-        .hero,
-        .case-panel {
-          min-height: auto;
-        }
-
-        .case-stack {
-          margin-top: 20px;
-          position: relative;
-          inset: auto;
-        }
-
-        .cards {
-          grid-template-columns: repeat(2, minmax(0, 1fr));
-        }
-
-        .lens-list {
-          grid-template-columns: repeat(2, minmax(0, 1fr));
-        }
+      .summary-hero h1 {
+        font-family: var(--font-display);
+        font-weight: 500;
+        font-size: clamp(28px, 4vw, 42px);
+        line-height: 1.08;
+        letter-spacing: -0.022em;
+        text-wrap: balance;
       }
 
-      @media (max-width: 580px) {
+      .summary-hero .lede {
+        color: var(--ink-secondary);
+        font-size: 16px;
+        line-height: 1.6;
+      }
+
+      .summary-stats {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 24px;
+        margin-top: 4px;
+      }
+
+      .verdict-card {
+        background: var(--surface-card);
+        border: 1px solid var(--accent-strong);
+        border-radius: var(--radius-md);
+        padding: 22px 24px;
+        display: grid;
+        gap: 10px;
+        position: relative;
+        overflow: hidden;
+      }
+
+      .verdict-card::before {
+        content: "";
+        position: absolute;
+        left: 0;
+        top: 0;
+        bottom: 0;
+        width: 3px;
+        background: var(--accent);
+      }
+
+      .verdict-label {
+        font-size: 11px;
+        font-weight: 600;
+        letter-spacing: 0.14em;
+        text-transform: uppercase;
+        color: var(--accent);
+      }
+
+      .verdict-source {
+        font-family: var(--font-display);
+        font-size: 22px;
+        font-weight: 500;
+        line-height: 1.2;
+        letter-spacing: -0.012em;
+      }
+
+      .verdict-explanation {
+        color: var(--ink-secondary);
+        font-size: 14px;
+        line-height: 1.6;
+      }
+
+      .reveal-list {
+        display: grid;
+        gap: 10px;
+      }
+
+      .reveal-card {
+        background: var(--surface-subtle);
+        border-left: 3px solid var(--border-soft);
+        border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+        padding: 14px 16px;
+        display: grid;
+        gap: 6px;
+      }
+
+      .reveal-card.lie {
+        border-left-color: var(--lie);
+      }
+
+      .reveal-card.truth,
+      .reveal-card.cleared {
+        border-left-color: var(--truth);
+      }
+
+      .reveal-card-head {
+        display: flex;
+        align-items: baseline;
+        justify-content: space-between;
+        gap: 8px;
+      }
+
+      .reveal-card-id {
+        font-family: var(--font-display);
+        font-size: 16px;
+        font-weight: 500;
+      }
+
+      .reveal-card-verdict {
+        font-size: 11px;
+        font-weight: 600;
+        letter-spacing: 0.10em;
+        text-transform: uppercase;
+        color: var(--ink-tertiary);
+      }
+
+      .reveal-card.lie .reveal-card-verdict {
+        color: var(--lie);
+      }
+
+      .reveal-card.truth .reveal-card-verdict,
+      .reveal-card.cleared .reveal-card-verdict {
+        color: var(--truth);
+      }
+
+      .reveal-card-text {
+        font-size: 13px;
+        line-height: 1.55;
+        color: var(--ink-secondary);
+      }
+
+      .summary-actions {
+        display: flex;
+        gap: 8px;
+        flex-wrap: wrap;
+      }
+
+      /* Responsive */
+      @media (max-width: 720px) {
         .shell {
-          padding: 10px;
+          padding: 18px;
+          gap: 18px;
         }
 
-        .hero,
-        .case-panel,
-        .topbar,
-        .asset-panel,
-        .question,
-        .answer,
-        .summary {
-          border-radius: 6px;
-          padding: 14px;
+        .shell-welcome {
+          padding: 24px 18px 36px;
         }
 
-        .topic-actions,
-        .question-row,
-        .asset-form,
-        .asset-preview,
-        .intro-flow,
-        .lens-list {
+        .welcome {
+          gap: 28px;
+        }
+
+        .round-header {
+          grid-template-columns: 1fr;
+          gap: 16px;
+        }
+
+        .round-actions {
+          flex-wrap: wrap;
+        }
+
+        .round-meta {
+          gap: 18px;
+        }
+
+        .meta-stat.phase {
+          margin-left: 0;
+        }
+
+        .score-panel {
           grid-template-columns: 1fr;
         }
 
-        .heading {
-          display: grid;
+        .score-rank {
+          justify-items: start;
+          text-align: left;
         }
 
-        .cards {
+        .form-row {
           grid-template-columns: 1fr;
+        }
+
+        .cards-grid {
+          grid-template-columns: 1fr;
+        }
+
+        .asset-panel {
+          grid-template-columns: 1fr;
+        }
+
+        .asset-image {
+          width: 100%;
+          height: 140px;
+        }
+
+        .asset-form {
+          grid-template-columns: 1fr;
+        }
+
+        .panel-header {
+          flex-wrap: wrap;
+        }
+      }
+
+      @media (prefers-reduced-motion: reduce) {
+        *,
+        *::before,
+        *::after {
+          animation-duration: 0.01ms !important;
+          transition-duration: 0.01ms !important;
         }
       }
     </style>
@@ -878,6 +1149,9 @@ export const SUS_WIDGET_HTML = `
   <body>
     <div id="root"></div>
     <script>
+      // All dynamic strings written into innerHTML are passed through the
+      // html() escaper below, which encodes &, <, >, " and ' to entities.
+      // This is the same pattern the original widget used.
       const root = document.getElementById("root");
       const savedUiState =
         (window.openai &&
@@ -893,6 +1167,7 @@ export const SUS_WIDGET_HTML = `
         busy: "",
         error: ""
       };
+      let gameSignature = serializeGame(state.game);
 
       function getStructuredContent(result) {
         if (!result) return null;
@@ -910,6 +1185,24 @@ export const SUS_WIDGET_HTML = `
           .replaceAll(">", "&gt;")
           .replaceAll('"', "&quot;")
           .replaceAll("'", "&#039;");
+      }
+
+      function serializeGame(value) {
+        try {
+          return JSON.stringify(value || null);
+        } catch (_) {
+          return "";
+        }
+      }
+
+      function setGame(nextGame) {
+        const nextSignature = serializeGame(nextGame);
+        if (nextSignature && nextSignature === gameSignature) {
+          return false;
+        }
+        state.game = nextGame;
+        gameSignature = nextSignature;
+        return true;
       }
 
       function callBridge(method, params) {
@@ -960,8 +1253,12 @@ export const SUS_WIDGET_HTML = `
         try {
           const nextGame = await callTool(name, args || {});
           if (nextGame) {
-            state.game = nextGame;
-            if (name === "start_game" || name === "start_round" || name === "reset_game") {
+            setGame(nextGame);
+            if (
+              name === "start_game" ||
+              name === "start_round" ||
+              name === "reset_game"
+            ) {
               state.flippingCardId = "";
             }
           }
@@ -984,7 +1281,6 @@ export const SUS_WIDGET_HTML = `
         if (!window.openai || typeof window.openai.setWidgetState !== "function") {
           return;
         }
-
         window.openai.setWidgetState({
           privateContent: {
             topic: state.topic,
@@ -995,14 +1291,66 @@ export const SUS_WIDGET_HTML = `
       }
 
       function getSuggestions(game) {
-        const raw = game && Array.isArray(game.suggestedTopics) ? game.suggestedTopics : [];
+        const raw =
+          game && Array.isArray(game.suggestedTopics) ? game.suggestedTopics : [];
         return raw
           .map((item) => (item && item.topic ? item.topic : item))
           .filter(Boolean)
           .slice(0, 5);
       }
 
+      function cardStateLabel(status) {
+        const labels = {
+          remaining: "Suspect",
+          cleared: "Cleared",
+          truth: "Truth",
+          lie: "Lie"
+        };
+        return labels[status] || status;
+      }
+
+      // Capture the currently focused input (if any) so we can restore
+      // focus + cursor position after innerHTML replace. Without this, any
+      // re-render while the user is typing destroys their input element
+      // and they lose focus mid-keystroke.
+      const FOCUS_INPUT_KEYS = ["data-topic", "data-question", "data-asset-prompt"];
+      function captureFocus() {
+        const active = document.activeElement;
+        if (!active || active.tagName !== "INPUT") return null;
+        for (const key of FOCUS_INPUT_KEYS) {
+          if (active.hasAttribute(key)) {
+            return {
+              key,
+              selectionStart: active.selectionStart,
+              selectionEnd: active.selectionEnd
+            };
+          }
+        }
+        return null;
+      }
+
+      function restoreFocus(snapshot) {
+        if (!snapshot) return;
+        const restored = root.querySelector("[" + snapshot.key + "]");
+        if (!restored) return;
+        restored.focus();
+        if (
+          snapshot.selectionStart != null &&
+          typeof restored.setSelectionRange === "function"
+        ) {
+          try {
+            restored.setSelectionRange(
+              snapshot.selectionStart,
+              snapshot.selectionEnd
+            );
+          } catch (_) {
+            // setSelectionRange throws on non-text inputs; safe to ignore.
+          }
+        }
+      }
+
       function render() {
+        const focusSnapshot = captureFocus();
         const game = state.game || {};
         syncPrefill(game);
         const reveal = game.reveal || null;
@@ -1013,14 +1361,18 @@ export const SUS_WIDGET_HTML = `
           root.innerHTML =
             '<main class="shell">' + renderSummary(game, reveal, status) + "</main>";
           bindEvents();
+          restoreFocus(focusSnapshot);
           notifyHeight();
           return;
         }
 
         if (!round) {
           root.innerHTML =
-            '<main class="shell">' + renderWelcome(game, status) + "</main>";
+            '<main class="shell shell-welcome">' +
+            renderWelcome(game, status) +
+            "</main>";
           bindEvents();
+          restoreFocus(focusSnapshot);
           notifyHeight();
           return;
         }
@@ -1034,212 +1386,466 @@ export const SUS_WIDGET_HTML = `
 
         root.innerHTML = [
           '<main class="shell">',
-          renderHeader(game, round, status, pendingQuestion, remainingCount, isComplete),
-          renderFocusStrip(pendingQuestion, isComplete),
-          renderAssetPanel(round),
-          game.answer ? renderAnswer(game.answer) : "",
+          renderRoundHeader(game, round, status, pendingQuestion, isComplete),
+          renderRoundMeta(game, pendingQuestion, isComplete, remainingCount),
+          renderScorePanel(game.score, false),
+          state.error
+            ? '<div class="error" role="alert">' + html(state.error) + "</div>"
+            : "",
           renderCards(cards, pendingQuestion, isComplete),
-          reveal && isComplete ? renderSummary(game, reveal, status) : "",
           pendingQuestion && !isComplete ? renderQuestion() : "",
+          game.answer ? renderAnswer(game.answer) : "",
+          renderAssetPanel(round),
+          reveal && isComplete ? renderSummary(game, reveal, status) : "",
           "</main>"
         ].join("");
 
         bindEvents();
+        restoreFocus(focusSnapshot);
         notifyHeight();
       }
 
       function renderWelcome(game, status) {
         const suggestions = getSuggestions(game);
-        const message =
-          game.message || "Start with a topic. Sus will build five source cards after you open the case.";
         const showError = state.error || status === "exa-search-failed";
+        const errorText =
+          state.error ||
+          (status === "exa-search-failed" ? game.message || "" : "");
+
         return [
-          '<section class="welcome">',
-          '<aside class="case-panel">',
-          '<div class="case-panel-header">',
-          '<div class="panel-heading">',
-          '<img class="panel-icon" src="/icons/sus-chatgpt-icon-128.png" alt="" width="48" height="48" decoding="async" loading="eager" />',
-          "<div>",
-          '<p class="eyebrow">New session</p>',
-          "<h2>Choose a case file</h2>",
+          '<div class="welcome">',
+          '<header class="welcome-mark">',
+          '<div class="brand-mark"><img src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAIAAAACACAMAAAD04JH5AAABFFBMVEX+9OL269js5Nbv6+L17uPu4c3//fLl3tTo28j98trWxKv427bc08TUuJXuz6v86cn/8M7Zyrbd0L7Jr47rxZn947zRvqSqm4mSiXR1cGhkWUxlXVRcWVXuto63sqdrYljk07vMxLZUTUPYz8LreUrqWRndo3bcwJvDvLLqilLsYyTJuaWXkYjulGmIe2z528TJtZpbU0rqXSHocTOtqpbyv6DkUQ1GRkXKf1dJQzyplHqKdFqSfWXWXSC4pIqjjXTkZRe5qZaZg2vKwa11b07DPgCpnXfogz91XUQzMCo4ODcnKCcbHBsgHx5DPTQjIR4+QTStk3OGjVx7g09rczZTSzm/wKdncDFcZiafpYEODg399OTu77/PAAAQXklEQVR42u1aC1fi2NLlJOQQYngENBCJCQGxUZAJSrcD2mFAPu+E0O34Ghy///8/btU5SQiK9tw7M93rrmUNjTwyqZ06u3ZVnZBKvdu7vdu7vdu7vdu7vdu7/a8Zecu+g3tBTK9MFJOvRFGU/mkIkkjfNoH8w9dPv3EEzfyjCOTQP6XhH8pesWf+GRXlf8x7NivJseNn170CQJUtSfq76ZhFgkuCoKroKMWeUs8XI4pKLl8oFiQ0QrJ/i2sJXAPHwYFWoglXsed4Kdi78vbWzs5OoVjkMMhfgEEkIjLP/PxE0hkA+vziqVCpVsSIHjkGgFkBYRQRxV9KuRUePYxAKvqY/aWCsVszDTGKwF4+RhChIPJ/AUFO0+cBCQGsQs4BWKZt26ZFNwNgIEid/PWUj5dgLS7wvrJr1xgA+gxAsbhTYDGAR/0/D0DqFQCpOPv5E3UaGIHm8wgUdva2wTX+B488+c/IL5VoIsFoKr0OgGlehobhqNTMWrQCMYBCYb/VOigWmO0UPsh/Oh1YzmecOK+ooGbgOU2IUqIr/06t5tBQgtR2Jo5NBKB42Do6OtrC60fLyaIgfFsaWNaLQD+5E12RZdRM0+iKNALAEFC1Ztu1ZrQKNFKmGEDxuHXUarX2whAUciUCR6XFN0DghfO0T6VJvcOSAFKsYRvdrtkzHSopzUiIqGAjADuzQkS5RIYAinut1uFPh639CIBbJ2l+KAexQXXEdMzuNJFdgqdL212jaVWpbbX7KlHUuBj1dtH/roG5QtuVTKwNCAAIkD85auXpXuskzxAUd9xYCigD8VycIOsSqYUAJDx1t5cxqAMPm1Rr0gpAF/zbNUQAamWZu7ZAI26AFMPCn7aOTrbocat1zAFsuWta9KJzeJ71AAAqH82YmYFhVWs9w6wZ/QGrBRjqAfq3WQx61MFgAJCQkCjFxX0gwBGh8Of0J0RQzLvPxXC9c5DF5wvSQQBWw6jZvZ45UKtdWjFKJV4NndA/i0GPvdo10hEJt7eQgEet0xQ5goVgNCxu6y8KQrJzIPIm0UnDCtBul4oQYAuWoaapSDSasWMDJoZgzGooTOXtnb0Wet6nPyGOfYIAckrEwVWoE/JMSuHar0igYJJXK7QLJ7abAECt1BRsSKgIUXlhoMXdCAAkwAkAOCXHDAjQsFjMaeiNqpaViRFoCQBKVNrD6IhEAyFA7xXD6tYM0AKjZiAHKK3u2hsA1Ox+l6fhxxMgwMkJoEAlOGodZxFACbwBXU2z1g69ED0WhCy8xk8lJ+YoKelc5Q2QAaOqWjasR73EeGHbmxGwekRzh59OwCAByT5gOGmdgv8CcpA2G0iaGic8ldcAsOB2z3h8MgMrXe/geoHEg9wBD6xeymyzCKjxCtRqNfYUPZsD/L9zP386YitAIQsZlL0iz0I66ONxYeGmJYWsag8TWWoN2xRoQI2hmZFdTCzHJAODDnq0ZxlGih8lZgQhA//gKbTwFb+ycu70UwvteO+EL8RhkWchrZiIsxECUJIc0LD2ULXBiVQ1TUdyBZbxfQtU0FBN2+C1gH7LIA33Do73T1ufGA7MgyzPQla3IQIhDd1kFtR1xj3TgO9E4EpjQJgUQlRss2Hsmo0uUCQCEPeiyc40/ACFqFjMksLWxz2AASFofSwWP7Bw026j348CQJLSlAXpxw97Jioy1cxGldMCy0G7Uu1i8hCiv4xA4n1YlAAAb0aLWQ4jDz0hy0L4ulnpRo0LiH0CgMSlfzB0IOMrot03JF2lq56bdcV8Cd4czEIAxcgIoMC/LmQhFdqWI0Zho46eKMuQBmzmcIYDWhvWaK9hqooW1teVOiqJnvAVAxLGEVjBKJRlQgc1s2/WutEK6lpSm5nwAUYTtLcPFajRt+pKOAHFJZ9wKVabTXXN4rfYx6dy2zvFZ0YgC1PdBsvXRpUDEN21RhlYyC7OqIHQNCyn0ejKOk2sABUF2RlhULTzi/MLZufMLmI7Z0JU/nx6vAdRIFmIPuEI8i5xGjVmYRZSab08QvkVOU3lJjBeNPuGrDP34Fh1Ol5lDP52sT6QdqfdbneYtfHR7kTPrEstf/78yy+ffjk9DGEggG2XtE2zYe6iDhkMgOpKyc4sYqE1BOkzjYzdMEtMiSbjKV7cdFzxJpan0W8xANJ7O5/fOzg8PfoFDGBsAwCohSnBqfRsqAWmzbooRVlrDSMWCo2uajf6DehCWVNGB2PP6pRkNqYhByh9OwkYCVnYfwphHCIAhzDkgjPo1Yz0Sw6GLKRq12wMa0bXUlmermf5t5Qw7Etz+Z1EFmzlt8IsjNpBgQWAPO+QGAuBgL2Kw7QIko41ZatZED5iAEQH7RL/XbJXaPBeDA87OPiIUohrX4iyMOmN9y1rMhSxEM8eKy1hShS5zgARJ6OZw7JgerHBztUwBD//3+ej/eODvXwhhAFZeOWQ5BYCPDT92XRAJB7xVefMFyWldSaVEWPi9OLcCXUArVRiT/CswUNTo8UpHx8fnjIC/iuEUcz/ej6aaFKiIXtBgagliGdPyZmce+BOPucZ0NFkWXbUNzjAhRhIiFs0W9t7IYxDkIIPI288hdNMtIwY5cqLeZ1rIWuGZGcygsudeex65XijIiThc+bDFwJZTWe4RVPgS48w9gjLQiJpVgVQVCYOJpf0okuPtFDtANgLPE4t6alEejMp3pAFza5h9vt924CCyb7NbTP3hUQqlBUW/pSkTUDQsNl8JkOxFlIZAu61mwILhJtK1FsgolNBIRI6kU06na555s/n87Ozue+fGQ4j4edDJoGsFvJEKGsk3k+UNByiFOXFcMi0kKY1OUoEIrNOlYqSDET0RqDFTIqbF1M0eB7PhvP5cO4HaIDD92FUTP/8OZTAWIkLFxeTElnb1OxoLwEwFsaNBU3L+hg/6ExZBkxHwESUYphLZG6k55+d+cHii//169y/DoL5PGho1N3ehpbsXzwRDg9QjLiWd1Qpmh+Ju2HXasVCpKE3upj9igCcyqTjqNjRURLOhqF157/Ng8XX2XjkeVCsdv1FAEFwPvByvIVKfHgKPTnJ61DPgNcMBNPBFzK0YiElzTaj4cjruGv+YimOBuTgbL7wp2VXdxxF0V3Xs79AEOY32JBEBGTN0baO8EW8Klg7vKqSvmGTgmkhlaYhDSGlwp4onpnY/gDl6U4tf+4v+p6rSTiVirKmuO7Yhxh8jTqiGEY4llEGooNZ2FE2AWAsJB1H5nxJs159pTERAP5egGtd9F1FwtPirpIsa7o7AgTBjG/UruxqxCiY2GBzN20b8oqc2IEnnQlN+l8JEXzWC4bB0NVZlUZGSpIk1xV3fO3PAzcCEP6ZzqajyaVM4oZecjfunPLpJI6VN55NozIrCKwe864Y1klo+mf+tacQPFKWwhtGcl3X7cU8sDmAQtiPFcodF1cfWCUzPUAObtqnCllIBVBDZAuwmyuRczu7u1VpOhzg1Nv7+4dgvrBhWkf/q1tWUl2Z+IHvf4DV39s/3d/jRISOFBjGTjqasIFP37hRxlkoomKPvU5TivaJfl/eo6mUR6B5D++BgdeeBieLLz+dxhhoiv1lHlR2isc4l3064B2pTMLsht4SOahrG7dNs5IOlBK9SUjDcJ9Iur+f3d/Ru1tKHARwC/4fgWtDpQ7HcP/pcFcDRLNyDWtQ2G6xyZxtTnyIkj5qnIi7eesaZmSZJrai07wnulzO7peis7wXMAuosLy9XVaD+Re7Dt8m/bPNtXrH94OHnWP03sLJvEByke6HbAYKvLJ7H7Ewfs9mQetRdS4FWAMZl4DKSytdGnw5W1RlWVxzz1K5rgwD/2ueA2B7xbEMxDNOSX9lrzRkYXQ/INwnUpe3EgXe3aXYEqTvllaqH/y26Ib0TycAYAgaUJe29z4xAJ8+4uZInQmhEGvoRhkKWUj40HB1ezvAiFwimurjHfh/vAxJ+Pvj/ew3SIIu5306vX6K0hAB7OwzEu4TvkdKhau72e1liMB97e5FNJ1cLpf3y8fbNEYEZfbq/nF5b4UdESCYPQ6BAz0OYG2LAAA4UJBAjbcOgYTH0JyxLBTuMJMeB6+XwmjRUQthvWfLqrD8g+J0hrSULx2BrmqB4HQhC2wGIL3ebhOpA189bOd3ils4oLA9UolePWIiX92rb8jQajqxlhAB8fflHXTmhEacwK95UwqvHN/35yU5DsCqXBDE9iveOOPlCPdICZndDh7vBGE5YB258upNAz6dDB6dqiUu72cS0aVVj5LiJGTbeXIf1mAAIpBen8tESYJvghsEEG7T41gm3N9SizZnENTUqzK06gsvYa2A9kugfdwk0RUANjVVQfL7EgcQH4IBGID/eXkNAJTCWzjlH0AspKHovn4HLdTCu8cqHP1oAe0Vmrg+UnJDALIOSxB0iSSmkrfRQIsb/nwxY7csQgA7uDlyubwHGi7v0vTVUhiRgKn97PFxieEi9QmhyQCVw+FFqhsLaELbKZK8jZgmWQNw+Te56LZVYae4XcZKYN0vl8ACymRIev2+EdHYvgyx/hg0WZ/juolBAC7c40Wd1F2ItD90UkSMIwCvqv7QX5wf4GiCd8qAiVtXioR7n4I1cHijsaEjf7lTE5UDCIGHAQN9UXBGvDifskEbyl4Fu+A5yhUR+UY7lQ3oEgL//PzmIMcxFPI3ZVzx5P1t/a2bqNlQC1dB1zzoeUej0XiMA+oUnsejEXu/u8BRwG5H5890z+B98LTYxc2j6fTm5uDg5sbTZJK81f+WDK2PqIx2abx0twwQAMDNlVeG3hdfjnEw+fUap5F5vzqw2lbXwBEJ/Ad+ML26mTK0N54O/tf8vSVDnIUdujZ4ElmZjJhzV1c0MEXPuWBlb3Rz7jMEPjN8ESyenvyGH7y1AfMNBstz5PXfW1BdefPe5YrojHWq7sHlcud11nlC6wmGOFzvavqAMxn6Ru/BF/9hwYaTeWBqbFK4uhmPPV1e7U5Q2Xv7PjqRFK/Ex5ASd16OnGPlyfIfcwAMaIH1snd18eBfL9hsuAi+7l4AMZ4Wfq0xDwwEiijKHESJd2UlT3n7pwRZEEPoXh0XInizunLuPPotC29AsQsHCOPz3YfhcPhgX0Ckrm76T5AcjYa/6GXZsIDBYiBuPNeBvhRkMPuN++Z1Hc4z8tav/OUvakD1cBqCxfa8KzAPGeqWz58gGvPGmf+lS0mElIHwrkZXnlL/5s85sLFUwLR6nTnPZl//eQucmk2F5TI4R7yaMr4GGkQIsmG8wkjgSf/Ez0nY8fKbzhMQZGQkWh3/H7mes4PFAmgICIIBzSZ+BSTxk/6Z3xDwRc7+yQMZXFni/bGslHevF9eIAPLCotn1c/4NPyzaiDU8OSOG7j1cf0GJOpsHQZv+7R43/cILbdWXu1cPmJn+GSDwNZr6vpYlkuaOvjIEGIO5+v0RyJo7/volQnBGUj8EwTxCsKh8Dxo8R6C4U58j8J+M/8+mfgSCC3/BasRTNfvdF4EjOAcEi8VT4JLvDyBG8PR0Pa1L2dQPQjDdHe6Oc/UfEAA+IWhQAN2cJv0YABgDqI1Y/bKpH4WA/E2/a/0rELI/0P27vdu7vdu7vdv/jv0birqGhN5Gxr4AAAAASUVORK5CYII=" alt="" width="44" height="44" decoding="async" loading="eager" /></div>',
+          '<p class="kicker">Sus · spot the spin</p>',
+          "</header>",
+
+          '<div class="welcome-hero">',
+          "<h1>Four sources are careful.<br />One is <em>bending the truth</em>.</h1>",
+          '<p class="lede">Pick any topic. Sus deals five plausible source cards — four stay precise; one quietly turns a caveat into certainty. Read closely, then accuse.</p>',
           "</div>",
-          "</div>",
-          '<p class="message">' + html(message) + "</p>",
-          showError ? '<p class="error" role="alert">' + html(state.error || game.message) + "</p>" : "",
-          "</div>",
+
+          renderScorePanel(game.score, true),
+
+          showError
+            ? '<div class="error" role="alert">' + html(errorText) + "</div>"
+            : "",
+
           '<form class="topic-form" data-topic-form>',
-          '<label class="dossier-label" for="topic-input">Topic</label>',
+          '<label class="form-label" for="topic-input">Begin a case</label>',
+          '<div class="form-row">',
           '<input id="topic-input" data-topic value="' +
             html(state.topic) +
-            '" placeholder="e.g. battery recycling" aria-label="Topic" />',
-          '<div class="topic-actions">',
+            '" placeholder="e.g. tariff policy, gut microbiome" aria-label="Topic" />',
           '<button data-action="start-topic" type="submit"' +
             (state.busy ? " disabled" : "") +
-            ">" +
-            html(state.busy || "Open case file") +
-            "</button>",
+            ">",
+          html(state.busy || "Open case"),
+          "</button>",
           "</div>",
           "</form>",
+
           suggestions.length
-            ? '<div><p class="microcopy">One-click starter cases</p><div class="suggestions">' +
+            ? [
+                '<div class="suggestions-block">',
+                '<p class="form-label">Or try a starter case</p>',
+                '<div class="suggestions">',
                 suggestions
                   .map(
                     (topic) =>
-                      '<button class="suggestion" data-action="suggest-topic" data-topic-value="' +
+                      '<button class="btn-pill" data-action="suggest-topic" data-topic-value="' +
                       html(topic) +
                       '" type="button">' +
                       html(topic) +
                       "</button>"
                   )
-                  .join("") +
-              "</div></div>"
+                  .join(""),
+                "</div>",
+                "</div>"
+              ].join("")
             : "",
-          "</aside>",
-          '<div class="hero">',
-          '<div class="hero-content">',
-          '<div class="case-mark"><img src="/icons/sus-app-icon-192.png" alt="" width="72" height="72" decoding="async" loading="eager" /></div>',
-          '<p class="eyebrow">Four truths · one lie</p>',
-          "<h1>Spot the tiny false spin.</h1>",
-          '<p class="lede">Choose any topic. Sus deals five credible source cards; four stay careful, one quietly turns a caveat into certainty.</p>',
-          '<div class="intro-flow" aria-label="How Sus works">',
-          renderIntroStep("1", "Pick a case", "Start from a topic or one of the suggested cases."),
-          renderIntroStep("2", "Compare wording", "Look for absolute claims, missing caveats, weak mechanisms, or broad scope."),
-          renderIntroStep("3", "Accuse one card", "Wrong guesses clear truth and unlock one clue question."),
+
+          '<div class="how-it-works">',
+          '<ol class="steps">',
+          renderStep(
+            "Compare.",
+            "Read every card with the same lens — caveats, scope, mechanism, certainty."
+          ),
+          renderStep(
+            "Accuse.",
+            "One card hides the spin. Wrong guesses clear truth and unlock one clue question."
+          ),
+          renderStep(
+            "Reveal.",
+            "Close the case to see every verdict — and the pattern you can carry forward."
+          ),
+          "</ol>",
           "</div>",
-          "</div>",
-          '<div class="case-stack" aria-hidden="true">',
-          renderFileStrip("A", "careful claim", "verified"),
-          renderFileStrip("B", "missing caveat", "suspect"),
-          renderFileStrip("C", "source signal", "compare"),
-          "</div>",
-          "</div>",
-          "</section>"
+          "</div>"
         ].join("");
       }
 
-      function renderIntroStep(id, title, text) {
+      function renderStep(title, body) {
         return (
-          '<div class="step"><strong>' +
-          html(id + " · " + title) +
-          "</strong><span>" +
-          html(text) +
-          "</span></div>"
-        );
-      }
-
-      function renderFileStrip(id, title, status) {
-        return (
-          '<div class="file-strip"><span class="file-id">' +
-          html(id) +
-          '</span><span class="file-title">' +
+          "<li><span><strong>" +
           html(title) +
-          '</span><span class="file-rule"></span></div>'
+          "</strong>" +
+          html(body) +
+          "</span></li>"
         );
       }
 
-      function renderHeader(
-        game,
-        round,
-        status,
-        pendingQuestion,
-        remainingCount,
-        isComplete
-      ) {
-        const score = game.score || {};
+      function renderRoundHeader(game, round, status, pendingQuestion, isComplete) {
+        const guidance = isComplete
+          ? "Case closed. Read each verdict to spot the pattern."
+          : pendingQuestion
+            ? "You earned a clue. Ask one source-checking question before guessing again."
+            : game.message ||
+              "Compare every card by caveats, scope, mechanism, and certainty.";
+
         return [
-          '<section class="topbar">',
-          '<div class="heading">',
-          '<div class="round-title">',
-          '<p class="eyebrow">Case board</p>',
-          "<h1>" + html(round.topic) + "</h1>",
-          '<p class="message">' +
-            html(game.message || "Compare every card by caveats, scope, mechanism, and absolute language.") +
+          '<header class="round-header">',
+          '<div class="round-context">',
+          '<p class="kicker' +
+            (isComplete ? " kicker-accent" : "") +
+            '">' +
+            html(isComplete ? "Case closed" : "Case file") +
             "</p>",
+          '<h1 class="round-topic">' + html(round.topic) + "</h1>",
+          '<p class="round-message">' + html(guidance) + "</p>",
           "</div>",
-          '<span class="status ' + html(status) + '">' + htmlStatus(status) + "</span>",
-          "</div>",
-          renderPhaseLine(pendingQuestion, isComplete),
-          '<div class="toolbar">',
-          '<button class="secondary" data-action="welcome" type="button"' +
+          '<div class="round-actions">',
+          '<button class="btn-secondary" data-action="welcome" type="button"' +
             (state.busy ? " disabled" : "") +
             ">New case</button>",
-          '<button class="secondary" data-action="reveal" type="button"' +
+          '<button class="btn-secondary" data-action="reveal" type="button"' +
             (state.busy || isComplete ? " disabled" : "") +
             ">Reveal</button>",
           "</div>",
-          '<div class="scorebar">',
-          "<span>" + html(String(remainingCount)) + " suspects remain</span>",
-          "<span>" + html(String(score.wrongGuesses || 0)) + " wrong guesses</span>",
-          "<span>" + html(String(score.wins || 0)) + " wins</span>",
-          "<span>" +
-            html(
-              pendingQuestion
-                ? "Question unlocked"
-                : isComplete
-                  ? "Round complete"
-                  : "Select a card"
-            ) +
-            "</span>",
-          "</div>",
-          state.error ? '<p class="error" role="alert">' + html(state.error) + "</p>" : "",
-          "</section>"
+          "</header>"
         ].join("");
       }
 
-      function renderPhaseLine(pendingQuestion, isComplete) {
-        const phase = pendingQuestion ? "question" : isComplete ? "summary" : "guess";
-        return (
-          '<div class="phase-line" aria-label="Round progress">' +
-          renderPhaseChip("1", "Compare", phase === "guess") +
-          renderPhaseChip("2", "Accuse", phase === "guess") +
-          renderPhaseChip("3", "Ask clue", phase === "question") +
-          renderPhaseChip("4", "Review spin", phase === "summary") +
-          "</div>"
-        );
-      }
-
-      function renderPhaseChip(number, label, current) {
-        return (
-          '<span class="phase-chip' +
-          (current ? " current" : "") +
-          '"><span>' +
-          html(number) +
-          "</span>" +
-          html(label) +
-          "</span>"
-        );
-      }
-
-      function renderFocusStrip(pendingQuestion, isComplete) {
-        const lead = isComplete
-          ? "The case is closed. Read the reveal as a pattern you can use next round."
+      function renderRoundMeta(game, pendingQuestion, isComplete, remainingCount) {
+        const score = game.score || {};
+        const phase = isComplete
+          ? "Case closed"
           : pendingQuestion
-            ? "You earned a clue. Ask about the remaining cards before guessing again."
-            : "Use the same lens on every card before you accuse one source.";
+            ? "Clue unlocked"
+            : "Compare & accuse";
 
         return [
-          '<section class="focus-strip" aria-label="Reading lens">',
-          '<div><p class="eyebrow">Reading lens</p><p class="message">' +
-            html(lead) +
-            "</p></div>",
-          '<div class="lens-list">',
-          renderLens("Scope", "Does a narrow finding become universal?"),
-          renderLens("Caveat", "Did an important limitation disappear?"),
-          renderLens("Mechanism", "Is the causal path named or hand-waved?"),
-          renderLens("Certainty", "Do words like all, always, or guarantees appear?"),
+          '<div class="round-meta">',
+          '<span class="meta-stat"><strong>' +
+            html(String(remainingCount)) +
+            "</strong>suspects</span>",
+          '<span class="meta-stat"><strong>' +
+            html(String(score.wrongGuesses || 0)) +
+            "</strong>wrong</span>",
+          '<span class="meta-stat"><strong>' +
+            html(String(score.wins || 0)) +
+            "</strong>wins</span>",
+          '<span class="meta-stat phase">' + html(phase) + "</span>",
+          "</div>"
+        ].join("");
+      }
+
+      function renderScorePanel(score, compact) {
+        if (!score) return "";
+        const totalPoints = score.totalPoints || 0;
+        const roundsStarted = score.roundsStarted || 0;
+        if (compact && totalPoints === 0 && roundsStarted === 0) return "";
+
+        const activeRound = score.activeRound || null;
+        const lastRound = score.lastRound || null;
+        const rank = score.rank || {};
+        const badges =
+          lastRound && Array.isArray(lastRound.badges) ? lastRound.badges : [];
+        const note = activeRound
+          ? "Active case: " +
+            activeRound.mistakes +
+            " wrong, " +
+            activeRound.questions +
+            " clue" +
+            (activeRound.questions === 1 ? "" : "s") +
+            " spent."
+          : lastRound && lastRound.summary
+            ? lastRound.summary
+            : roundsStarted
+              ? "Open another case to build your streak."
+              : "";
+
+        return [
+          '<section class="score-panel' + (compact ? " compact" : "") + '">',
+          '<div class="score-main">',
+          renderScoreStat(totalPoints, "points"),
+          renderScoreStat(score.currentStreak || 0, "streak"),
+          renderScoreStat(score.bestStreak || 0, "best"),
+          renderScoreStat(score.perfectRounds || 0, "perfect"),
+          "</div>",
+          '<div class="score-rank">',
+          '<span class="rank-label">' +
+            html(rank.label || "New Investigator") +
+            "</span>",
+          '<span class="rank-progress">' + html(renderRankProgress(rank)) + "</span>",
+          "</div>",
+          note ? '<p class="score-note">' + html(note) + "</p>" : "",
+          badges.length
+            ? '<div class="badge-list">' +
+              badges
+                .slice(0, 4)
+                .map((badge) => '<span class="badge">' + html(badge.label) + "</span>")
+                .join("") +
+              "</div>"
+            : "",
+          "</section>"
+        ].join("");
+      }
+
+      function renderScoreStat(value, label) {
+        return [
+          '<span class="score-stat">',
+          '<span class="score-value">' + html(String(value || 0)) + "</span>",
+          '<span class="score-label">' + html(label) + "</span>",
+          "</span>"
+        ].join("");
+      }
+
+      function renderRankProgress(rank) {
+        if (!rank || !rank.nextLabel) return "Top rank reached";
+        return (
+          String(rank.pointsToNext || 0) +
+          " points to " +
+          String(rank.nextLabel)
+        );
+      }
+
+      function renderCards(cards, pendingQuestion, isComplete) {
+        return [
+          '<section class="cards-grid" aria-label="Source cards">',
+          cards
+            .map((card) => {
+              const selectable =
+                !state.busy &&
+                card.status === "remaining" &&
+                !pendingQuestion &&
+                !isComplete;
+              const isFlipped =
+                state.flippingCardId === card.id || card.status !== "remaining";
+              const isChecking = state.flippingCardId === card.id;
+
+              const classes = ["card", card.status];
+              if (selectable) classes.push("selectable");
+              if (isFlipped) classes.push("flipped");
+
+              return [
+                '<article class="' + classes.join(" ") + '"',
+                selectable
+                  ? ' role="button" tabindex="0" data-action="guess" data-card-id="' +
+                    html(card.id) +
+                    '"'
+                  : "",
+                ' aria-label="Card ' +
+                  html(card.id) +
+                  ": " +
+                  html(card.headline) +
+                  '">',
+                '<div class="card-inner">',
+                renderCardFront(card, selectable),
+                renderCardBack(card, isChecking),
+                "</div>",
+                "</article>"
+              ].join("");
+            })
+            .join(""),
+          "</section>"
+        ].join("");
+      }
+
+      function renderCardFront(card, selectable) {
+        const ctaText = selectable
+          ? "Accuse"
+          : card.credibilitySignal
+            ? card.credibilitySignal
+            : cardStateLabel(card.status);
+
+        return [
+          '<div class="card-face card-front">',
+          '<div class="card-top">',
+          '<span class="card-id">' + html(card.id) + "</span>",
+          '<span class="card-status-tag">' +
+            html(cardStateLabel(card.status)) +
+            "</span>",
+          "</div>",
+          '<div class="card-body">',
+          '<p class="card-source">' +
+            html(
+              card.sourceName +
+                " · " +
+                card.sourceType +
+                " · " +
+                card.published
+            ) +
+            "</p>",
+          '<h2 class="card-headline">' + html(card.headline) + "</h2>",
+          '<p class="card-claim">' + html(card.claim) + "</p>",
+          card.excerpt
+            ? '<p class="card-evidence">' + html(card.excerpt) + "</p>"
+            : "",
+          "</div>",
+          '<div class="card-bottom">',
+          '<span class="card-cta">' + html(ctaText) + "</span>",
+          renderSourceLink(card),
+          "</div>",
+          "</div>"
+        ].join("");
+      }
+
+      function renderCardBack(card, isChecking) {
+        const verdict =
+          card.verdict || (card.status === "cleared" ? "truth" : card.status);
+        const title =
+          card.status === "lie"
+            ? "Sus source"
+            : verdict === "truth" || card.status === "cleared"
+              ? "Careful claim"
+              : "Checking…";
+        const body =
+          card.explanation ||
+          (isChecking
+            ? "Cross-checking against the hidden answer."
+            : "The verdict will appear after the card is checked.");
+        const tag =
+          verdict === "lie"
+            ? "Lie"
+            : verdict === "truth"
+              ? "Truth"
+              : "Checking";
+
+        return [
+          '<div class="card-face card-back">',
+          '<div class="card-top">',
+          '<span class="card-id">' + html(card.id) + "</span>",
+          '<span class="card-status-tag">' + html(tag) + "</span>",
+          "</div>",
+          '<div class="card-back-body">',
+          '<h2 class="card-back-title">' + html(title) + "</h2>",
+          '<p class="card-back-text">' + html(body) + "</p>",
+          "</div>",
+          '<div class="card-bottom">',
+          '<span class="card-cta">' +
+            html(cardStateLabel(card.status)) +
+            "</span>",
+          renderSourceLink(card),
+          "</div>",
+          "</div>"
+        ].join("");
+      }
+
+      function renderSourceLink(card) {
+        if (!card.url) return "<span></span>";
+        return (
+          '<button class="card-link" data-action="open-source" data-url="' +
+          html(card.url) +
+          '" type="button">Source ↗</button>'
+        );
+      }
+
+      function renderQuestion() {
+        return [
+          '<section class="panel accent">',
+          '<header class="panel-header">',
+          '<h2 class="panel-title">One clue earned</h2>',
+          '<span class="panel-pill">Ask before next guess</span>',
+          "</header>",
+          '<p class="panel-body">You cleared a careful card. Use one source-checking question before accusing again.</p>',
+          '<div class="form-row">',
+          '<input data-question value="' +
+            html(state.question) +
+            '" placeholder="What wording should I compare next?" aria-label="Question" />',
+          '<button data-action="ask" type="button"' +
+            (state.busy ? " disabled" : "") +
+            ">",
+          html(state.busy || "Ask"),
+          "</button>",
+          "</div>",
+          '<div class="clue-presets" aria-label="Suggested clue questions">',
+          renderQuestionPreset(
+            "What wording should I compare next?",
+            "Compare wording"
+          ),
+          renderQuestionPreset(
+            "Which remaining card overclaims causation?",
+            "Overclaimed causation"
+          ),
+          renderQuestionPreset(
+            "Which caveat matters most here?",
+            "Critical caveat"
+          ),
           "</div>",
           "</section>"
         ].join("");
       }
 
-      function renderLens(title, text) {
+      function renderQuestionPreset(value, label) {
         return (
-          '<p class="lens"><strong>' +
-          html(title) +
-          "</strong><br />" +
-          html(text) +
-          "</p>"
+          '<button class="btn-pill" data-action="preset-question" data-question-value="' +
+          html(value) +
+          '" type="button">' +
+          html(label) +
+          "</button>"
         );
+      }
+
+      function renderAnswer(answer) {
+        const clues = Array.isArray(answer.clues) ? answer.clues : [];
+        const citations = Array.isArray(answer.citations) ? answer.citations : [];
+
+        return [
+          '<section class="panel">',
+          '<header class="panel-header">',
+          '<h2 class="panel-title">Clue filed</h2>',
+          '<span class="panel-pill">' +
+            html(answer.source || "source check") +
+            "</span>",
+          "</header>",
+          '<p class="panel-body">' + html(answer.summary || "") + "</p>",
+          citations.length
+            ? '<div class="citation-list">' +
+                citations
+                  .slice(0, 5)
+                  .map(
+                    (c) =>
+                      '<div class="citation"><a href="' +
+                      html(c.url) +
+                      '" target="_blank" rel="noreferrer">' +
+                      html(c.title) +
+                      "</a>" +
+                      (c.published
+                        ? '<div class="citation-meta">' +
+                          html(c.published) +
+                          "</div>"
+                        : "") +
+                      "</div>"
+                  )
+                  .join("") +
+                "</div>"
+            : "",
+          clues.length
+            ? '<div class="clue-list">' +
+                clues
+                  .map(
+                    (c) =>
+                      '<div class="clue"><strong>' +
+                      html(c.cardId + " · " + c.sourceName) +
+                      "</strong> " +
+                      html(c.clue) +
+                      "</div>"
+                  )
+                  .join("") +
+                "</div>"
+            : "",
+          "</section>"
+        ].join("");
       }
 
       function renderAssetPanel(round) {
@@ -1250,247 +1856,49 @@ export const SUS_WIDGET_HTML = `
           hasImage && image.prompt
             ? image.prompt
             : (round.futureAssets && round.futureAssets.artPrompt) || "";
-        const buttonLabel = state.busy || (hasImage ? "Regenerate art" : "Generate art");
+        const buttonLabel =
+          state.busy === "Generating art"
+            ? "Generating…"
+            : hasImage
+              ? "Regenerate"
+              : "Generate art";
 
         return [
-          '<section class="asset-panel">',
-          '<div class="asset-preview">',
+          '<aside class="asset-panel">',
           hasImage
             ? '<img class="asset-image" src="' +
-                html(image.url) +
-                '" alt="' +
-                html("Generated art for " + round.topic) +
-                '" />'
-            : '<div class="asset-image" role="img" aria-label="No generated art yet"></div>',
-          '<div class="asset-copy">',
-          '<p class="eyebrow">Optional case visual</p>',
-          '<h2>' + html(hasImage ? "Case art ready" : "Generate a quick board image") + "</h2>",
-          '<p class="microcopy">' + html(prompt) + "</p>",
-          hasImage
+              html(image.url) +
+              '" alt="Generated art for ' +
+              html(round.topic) +
+              '" />'
+            : '<div class="asset-image placeholder" role="img" aria-label="No image yet"></div>',
+          '<div class="asset-content">',
+          '<p class="kicker">Optional case visual</p>',
+          prompt
+            ? '<p class="asset-prompt-text">' + html(prompt) + "</p>"
+            : "",
+          hasImage && image.model
             ? '<p class="asset-meta">' +
-                html(image.model + " · seed " + image.seed) +
-                "</p>"
+              html(image.model + " · seed " + image.seed) +
+              "</p>"
             : "",
           assets.imageError
-            ? '<p class="error" role="alert">' + html(assets.imageError) + "</p>"
+            ? '<div class="error" role="alert">' +
+              html(assets.imageError) +
+              "</div>"
             : "",
           '<div class="asset-form">',
           '<input data-asset-prompt value="' +
             html(state.assetPrompt) +
             '" placeholder="Optional visual direction" aria-label="Visual direction" />',
-          '<button data-action="generate-asset" type="button"' +
+          '<button class="btn-secondary" data-action="generate-asset" type="button"' +
             (state.busy ? " disabled" : "") +
             ">" +
             html(buttonLabel) +
             "</button>",
           "</div>",
           "</div>",
-          "</div>",
-          "</section>"
-        ].join("");
-      }
-
-      function renderCards(cards, pendingQuestion, isComplete) {
-        return (
-          '<section class="cards" aria-label="Source cards">' +
-          cards
-            .map((card) => {
-              const selectable =
-                !state.busy &&
-                card.status === "remaining" &&
-                !pendingQuestion &&
-                !isComplete;
-              const isFlipped =
-                state.flippingCardId === card.id || card.status !== "remaining";
-              return (
-                '<article class="card ' +
-                html(card.status) +
-                (selectable ? " selectable" : "") +
-                (isFlipped ? " flipped" : "") +
-                '"' +
-                (selectable
-                  ? ' role="button" tabindex="0" data-action="guess" data-card-id="' +
-                    html(card.id) +
-                    '"'
-                  : "") +
-                ' aria-label="Card ' +
-                html(card.id) +
-                ": " +
-                html(card.headline) +
-                '">' +
-                '<div class="card-shell">' +
-                '<div class="card-face card-front">' +
-                '<div class="card-top"><span class="card-id">' +
-                html(card.id) +
-                '</span><span class="card-state">' +
-                html(cardStateLabel(card.status)) +
-                "</span></div>" +
-                "<h2>" +
-                html(card.headline) +
-                "</h2>" +
-                '<p class="meta">' +
-                html(card.sourceName + " · " + card.sourceType + " · " + card.published) +
-                "</p>" +
-                '<p class="claim">' +
-                '<span class="field-label">Claim</span>' +
-                html(card.claim) +
-                "</p>" +
-                '<p class="excerpt">' +
-                '<span class="field-label">Evidence note</span>' +
-                html(card.excerpt) +
-                "</p>" +
-                '<p class="signal">' +
-                '<span class="field-label">Credibility signal</span>' +
-                html(card.credibilitySignal) +
-                "</p>" +
-                '<div class="card-footer">' +
-                '<span>' +
-                html(selectable ? "Click to accuse" : cardStateLabel(card.status)) +
-                "</span>" +
-                renderSourceLink(card) +
-                "</div>" +
-                "</div>" +
-                renderCardBack(card, state.flippingCardId === card.id) +
-                "</div>" +
-                "</article>"
-              );
-            })
-            .join("") +
-          "</section>"
-        );
-      }
-
-      function renderSourceLink(card) {
-        if (!card.url) return "";
-
-        return (
-          '<button class="secondary source-link" data-action="open-source" data-url="' +
-          html(card.url) +
-          '" type="button">Open source</button>'
-        );
-      }
-
-      function renderCardBack(card, isChecking) {
-        const title =
-          card.status === "lie"
-            ? "Lie found"
-            : card.status === "truth" || card.status === "cleared"
-              ? "Truth checked"
-              : "Checking";
-        const body =
-          card.explanation ||
-          (isChecking
-            ? "Checking this card against the hidden answer."
-            : "This result is available after the card is checked.");
-        const verdict = card.verdict || (card.status === "cleared" ? "truth" : card.status);
-
-        return (
-          '<div class="card-face card-back">' +
-          '<div class="card-top"><span class="card-id">' +
-          html(card.id) +
-          '</span><span class="card-state">' +
-          html(verdict === "lie" ? "Lie" : verdict === "truth" ? "Truth" : "Checking") +
-          "</span></div>" +
-          "<h2>" +
-          html(title) +
-          "</h2>" +
-          '<p class="message">' +
-          html(body) +
-          "</p>" +
-          '<p class="signal">' +
-          html(
-            verdict === "lie"
-              ? "The round is solved. Review the summary to see the full source spin."
-              : "This card leaves the suspect pool but stays visible for comparison."
-          ) +
-          "</p>" +
-          '<div class="card-footer"><span>' +
-          html(cardStateLabel(card.status)) +
-          "</span>" +
-          renderSourceLink(card) +
-          "</div>" +
-          "</div>"
-        );
-      }
-
-      function renderQuestion() {
-        return [
-          '<section class="question">',
-          "<h3>One clue question</h3>",
-          '<p class="message muted">You cleared a truthful card. Ask one source-checking question before the next guess.</p>',
-          '<div class="question-row">',
-          '<input data-question value="' +
-            html(state.question) +
-            '" placeholder="What wording should I compare next?" aria-label="Question" />',
-          '<button data-action="ask" type="button"' +
-            (state.busy ? " disabled" : "") +
-            ">" +
-            html(state.busy || "Ask") +
-            "</button>",
-          "</div>",
-          '<div class="suggestions" aria-label="Suggested clue questions">',
-          renderQuestionPreset("What wording should I compare next?"),
-          renderQuestionPreset("Which remaining card overclaims causation?"),
-          renderQuestionPreset("Which caveat matters most here?"),
-          "</div>",
-          "</section>"
-        ].join("");
-      }
-
-      function renderQuestionPreset(question) {
-        return (
-          '<button class="suggestion" data-action="preset-question" data-question-value="' +
-          html(question) +
-          '" type="button">' +
-          html(question) +
-          "</button>"
-        );
-      }
-
-      function renderAnswer(answer) {
-        const clues = Array.isArray(answer.clues) ? answer.clues : [];
-        const citations = Array.isArray(answer.citations) ? answer.citations : [];
-        return [
-          '<section class="answer">',
-          '<div class="answer-top">',
-          "<h3>Clue filed</h3>",
-          '<span class="source-pill">' +
-            html(answer.source || "source check") +
-            "</span>",
-          "</div>",
-          '<p class="message">' + html(answer.summary || "") + "</p>",
-          citations.length
-            ? '<div class="citation-list">' +
-                citations
-                  .slice(0, 5)
-                  .map(
-                    (citation) =>
-                      '<p class="citation"><a href="' +
-                      html(citation.url) +
-                      '" target="_blank" rel="noreferrer">' +
-                      html(citation.title) +
-                      "</a>" +
-                      html(citation.published ? " · " + citation.published : "") +
-                      "</p>"
-                  )
-                  .join("") +
-              "</div>"
-            : "",
-          clues.length
-            ? '<div class="clue-list">' +
-                clues
-                  .map(
-                    (clue) =>
-                      '<p class="clue"><strong>' +
-                      html(clue.cardId + " · " + clue.sourceName) +
-                      ":</strong> " +
-                      html(clue.clue) +
-                      "</p>"
-                  )
-                  .join("") +
-              "</div>"
-            : "",
-          "</section>"
+          "</aside>"
         ].join("");
       }
 
@@ -1502,73 +1910,110 @@ export const SUS_WIDGET_HTML = `
         const wrongGuesses = guesses.filter(
           (guess) => guess && guess.result === "truth"
         ).length;
+        const isWon = status === "won";
+        const score = game.score || {};
+        const lastRound = score.lastRound || null;
+        const roundBadges =
+          lastRound && Array.isArray(lastRound.badges) ? lastRound.badges : [];
+
         return [
           '<section class="summary">',
-          '<div class="heading">',
-          '<div class="round-title">',
-          '<p class="eyebrow">Round summary</p>',
-          "<h1>" + html(reveal.topic || "Case closed") + "</h1>",
-          '<p class="message">' +
-            html(game.message || "The source board is revealed.") +
-            "</p>",
-          "</div>",
-          '<span class="status ' + html(status) + '">' + htmlStatus(status) + "</span>",
-          "</div>",
-          '<div class="summary-grid">',
           '<div class="summary-hero">',
-          "<h2>" + html(lie ? "Sus source: card " + lie.id : "Case revealed") + "</h2>",
-          '<p class="message">' + html(lie ? lie.explanation : "Review each explanation before starting another case.") + "</p>",
-          '<div class="scorebar">',
-          "<span>" + html(String(wrongGuesses)) + " wrong guesses</span>",
-          "<span>" + html(String(questions.length)) + " questions asked</span>",
-          "<span>" + html(String(cards.length)) + " source cards reviewed</span>",
+          '<p class="kicker' +
+            (isWon ? " kicker-accent" : "") +
+            '">' +
+            html(isWon ? "Case solved" : "Case revealed") +
+            "</p>",
+          "<h1>" + html(reveal.topic || "Case closed") + "</h1>",
+          '<p class="lede">' +
+            html(
+              game.message ||
+                (isWon
+                  ? "You found the source spinning the truth. Read the rest to spot the pattern."
+                  : "Here is the full source board with each verdict explained.")
+            ) +
+            "</p>",
+          '<div class="summary-stats">',
+          isWon && lastRound
+            ? '<span class="meta-stat"><strong>' +
+              html(String(lastRound.points || 0)) +
+              "</strong>points</span>"
+            : "",
+          isWon && lastRound
+            ? '<span class="meta-stat"><strong>' +
+              html(lastRound.grade || "D") +
+              "</strong>grade</span>"
+            : "",
+          '<span class="meta-stat"><strong>' +
+            html(String(wrongGuesses)) +
+            "</strong>wrong guesses</span>",
+          '<span class="meta-stat"><strong>' +
+            html(String(questions.length)) +
+            "</strong>questions asked</span>",
+          '<span class="meta-stat"><strong>' +
+            html(String(cards.length)) +
+            "</strong>cards reviewed</span>",
           "</div>",
-          '<div class="toolbar">',
-          '<button data-action="welcome" type="button">Play again</button>',
-          '<button class="secondary" data-action="close" type="button">Quit</button>',
+          roundBadges.length
+            ? '<div class="badge-list">' +
+              roundBadges
+                .map((badge) => '<span class="badge">' + html(badge.label) + "</span>")
+                .join("") +
+              "</div>"
+            : "",
           "</div>",
-          "</div>",
+
+          lie
+            ? [
+                '<div class="verdict-card">',
+                '<p class="verdict-label">The sus source</p>',
+                '<p class="verdict-source">Card ' +
+                  html(lie.id) +
+                  (lie.sourceName ? " · " + html(lie.sourceName) : "") +
+                  "</p>",
+                '<p class="verdict-explanation">' +
+                  html(lie.explanation || "") +
+                  "</p>",
+                "</div>"
+              ].join("")
+            : "",
+
           '<div class="reveal-list">',
           cards
             .map(
               (card) =>
-                '<div class="reveal-card"><p><strong>' +
-                html(card.id + " · " + card.verdict) +
-                "</strong></p><p>" +
-                html(card.explanation) +
-                "</p></div>"
+                '<div class="reveal-card ' +
+                html(card.verdict || "") +
+                '">' +
+                '<div class="reveal-card-head">' +
+                '<span class="reveal-card-id">' +
+                html(
+                  card.id +
+                    (card.sourceName ? " · " + card.sourceName : "")
+                ) +
+                "</span>" +
+                '<span class="reveal-card-verdict">' +
+                html(card.verdict || "") +
+                "</span>" +
+                "</div>" +
+                '<p class="reveal-card-text">' +
+                html(card.explanation || "") +
+                "</p>" +
+                "</div>"
             )
             .join(""),
           "</div>",
+
+          '<div class="summary-actions">',
+          '<button data-action="welcome" type="button">New case</button>',
+          '<button class="btn-secondary" data-action="close" type="button">Close</button>',
           "</div>",
-          state.error ? '<p class="error" role="alert">' + html(state.error) + "</p>" : "",
+
+          state.error
+            ? '<div class="error" role="alert">' + html(state.error) + "</div>"
+            : "",
           "</section>"
         ].join("");
-      }
-
-      function htmlStatus(status) {
-        const labels = {
-          idle: "Idle",
-          welcome: "Welcome",
-          active: "Active",
-          won: "Solved",
-          revealed: "Revealed",
-          "truth-cleared": "Truth cleared",
-          "question-required": "Question required",
-          "question-answered": "Question answered",
-          "exa-search-failed": "Search failed"
-        };
-        return labels[status] || status;
-      }
-
-      function cardStateLabel(status) {
-        const labels = {
-          remaining: "Suspect",
-          cleared: "Cleared",
-          truth: "Truth",
-          lie: "Lie"
-        };
-        return labels[status] || status;
       }
 
       function bindEvents() {
@@ -1576,8 +2021,9 @@ export const SUS_WIDGET_HTML = `
         if (topicInput) {
           topicInput.addEventListener("input", (event) => {
             state.topic = event.target.value;
-            persistUiState();
           });
+          topicInput.addEventListener("change", persistUiState);
+          topicInput.addEventListener("blur", persistUiState);
         }
 
         const topicForm = root.querySelector("[data-topic-form]");
@@ -1592,16 +2038,18 @@ export const SUS_WIDGET_HTML = `
         if (questionInput) {
           questionInput.addEventListener("input", (event) => {
             state.question = event.target.value;
-            persistUiState();
           });
+          questionInput.addEventListener("change", persistUiState);
+          questionInput.addEventListener("blur", persistUiState);
         }
 
         const assetPromptInput = root.querySelector("[data-asset-prompt]");
         if (assetPromptInput) {
           assetPromptInput.addEventListener("input", (event) => {
             state.assetPrompt = event.target.value;
-            persistUiState();
           });
+          assetPromptInput.addEventListener("change", persistUiState);
+          assetPromptInput.addEventListener("blur", persistUiState);
         }
 
         root.querySelectorAll("[data-action]").forEach((element) => {
@@ -1634,6 +2082,7 @@ export const SUS_WIDGET_HTML = `
               const hasImage = Boolean(
                 round && round.assets && round.assets.image
               );
+              persistUiState();
               await runTool(
                 "generate_round_asset",
                 {
@@ -1717,7 +2166,10 @@ export const SUS_WIDGET_HTML = `
       }
 
       function notifyHeight() {
-        if (window.openai && typeof window.openai.notifyIntrinsicHeight === "function") {
+        if (
+          window.openai &&
+          typeof window.openai.notifyIntrinsicHeight === "function"
+        ) {
           window.openai.notifyIntrinsicHeight();
         }
       }
@@ -1727,8 +2179,10 @@ export const SUS_WIDGET_HTML = `
         (event) => {
           const nextOutput =
             event.detail && event.detail.globals && event.detail.globals.toolOutput;
-          if (nextOutput) {
-            state.game = nextOutput;
+          // Skip re-render when the host echoes back an unchanged toolOutput.
+          // Without this, host global updates can tear down the DOM while a
+          // draft input is focused.
+          if (nextOutput && setGame(nextOutput)) {
             render();
           }
         },
@@ -1748,8 +2202,7 @@ export const SUS_WIDGET_HTML = `
             return;
           }
           const nextOutput = getStructuredContent(message.params);
-          if (nextOutput) {
-            state.game = nextOutput;
+          if (nextOutput && setGame(nextOutput)) {
             render();
           }
         },
