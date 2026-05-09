@@ -1,181 +1,229 @@
-# Sus Overall Game Flow
+# Sus Current Game Flow
 
-Sus is a source-checking game where ChatGPT hosts the session, the Sus Agent
-MCP server owns the game state, and the rendered UI lets the player inspect and
-guess from five source cards. Each round has four truthful cards and one
-source-derived card with a subtle false spin.
+Sus is a source-checking game where ChatGPT hosts the conversation, the Sus MCP
+server owns the rules, and the rendered widget lets the player inspect five
+source cards. Each round has four truthful cards and one card with a subtle
+false spin.
 
-## MVP Game Loop
+This document describes the current implementation in `src/`, not future scope.
 
-1. The user asks ChatGPT to start a new session of Sus.
-2. ChatGPT returns the Sus rendered UI.
-3. The first screen is a welcome page that prompts the user to enter a topic.
-4. The user enters a topic and starts the round.
-5. The Sus Agent MCP server requests five relevant sources from Exa.
-6. The server keeps four cards truthful and chooses one card to receive a minor
-   but material spin, turning it into the lie.
-7. ChatGPT returns an interactive source-card board with five cards.
-8. The user selects the card they think is the lie.
-9. The selected card flips over in the UI to reveal whether it is truth or lie.
-10. If the selected card is the lie, the player wins the round.
-11. If the selected card is truthful, the card is cleared from the suspect pool.
-12. The player guesses again from the remaining uncleared cards.
-13. The guess loop repeats until the lie is found.
-14. When the lie is found, the UI reveals the false spin and the round summary.
-15. The user returns to the welcome page and can start another round.
-16. The user may quit the game.
+## Runtime Boundaries
 
-## Primary Screens
+- `src/server.ts` is the Cloudflare Worker entrypoint.
+- `/mcp` and `/mcp/*` are handled by the Worker before static assets.
+- `/.well-known/oauth-protected-resource` exposes OAuth protected-resource
+  metadata when auth is configured.
+- `/` returns a minimal HTML app shell telling clients to connect to `/mcp`.
+- Static files in `public/` provide icons, the manifest, and source-card art.
 
-### Welcome Page
+## State Boundaries
 
-The welcome page is the first rendered UI after ChatGPT starts Sus. It should
-feel like the start of a case file, not a rules manual.
+- `SusGameMcp` extends the Cloudflare `Agent` class.
+- The `SusGameMcp` Durable Object binding gives each resolved player a scoped
+  Agent instance.
+- The Agent stores MCP transport state, player identity, active game state,
+  score, generated image data, guesses, and clue history.
+- D1 stores completed round results and aggregate leaderboard rows.
 
-Required controls:
+## External Services
 
+- Exa Search is used for arbitrary topic rounds when `EXA_API_KEY` is present.
+- Exa Answer is used for optional clue questions when `EXA_API_KEY` is present.
+- Local starter packs and local clue hints are available without Exa.
+- Workers AI generates the selected source-card spin for Exa/custom rounds.
+- If Workers AI spin generation fails, `src/game.ts` applies a local wording
+  spin.
+- Workers AI can generate an optional round image through `generate_round_asset`.
+
+## Primary Flow
+
+1. The user asks ChatGPT to start Sus.
+2. ChatGPT calls `start_game`.
+3. The server creates a session if needed and returns welcome-state tool output.
+4. The widget renders the welcome screen with topic input and starter
+   suggestions.
+5. The user enters a topic or chooses a suggested topic.
+6. The widget calls `start_round` with the topic.
+7. The server asks Exa for candidate sources.
+8. The server asks Workers AI to spin one source claim into a subtle lie.
+9. The server creates a shuffled five-card round and starts scoring.
+10. The widget renders the source-card board.
+11. The user selects a card.
+12. The widget calls `guess_sus_source` with the visible card ID.
+13. If the card is truthful, the server marks it cleared and records a wrong
+    guess.
+14. If only the lie remains after a truthful guess, the player wins by
+    elimination.
+15. If the selected card is the lie, the player wins directly.
+16. On win or reveal, the server returns full reveal data and persists the score
+    result to D1 when possible.
+17. The widget renders the round summary.
+18. The user can start a new case through `reset_game`.
+
+## Round Modes
+
+`start_round` supports three implemented modes:
+
+- Topic round: `topic` is present and `sources` is omitted. Sus uses Exa Search,
+  then spins one source with Workers AI or the local fallback.
+- Starter round: `topic` and `sources` are omitted. Sus uses one bundled starter
+  pack from `src/game.ts`.
+- Custom round: exactly five `sources` are provided. Sus keeps four cards
+  truthful and spins one into the lie.
+
+The widget path always starts topic rounds because its welcome form requires a
+topic. Starter rounds are mainly for Inspector and local demo calls.
+
+## Widget Screens
+
+### Welcome
+
+The welcome screen shows:
+
+- Sus branding.
+- Optional signed-in display name.
 - Topic input.
-- Start game button.
-- Optional suggested topics.
-- Quit or close action if the host supports it.
+- Start button.
+- Suggested starter topics from `list_topics`.
+- Compact score panel.
+- Short play pattern: compare, accuse, reveal.
 
-The welcome page should be reachable again after a completed round.
+### Case Loader
+
+While `start_round` is running, the widget renders a case-building loader. This
+is local UI state while the MCP tool call is in flight.
 
 ### Source Card Board
 
-The board shows five source cards for the chosen topic. Each card should look
-credible enough to inspect, compare, and challenge.
+The board shows a carousel of five cards. Each card includes:
 
-Each card should show:
-
+- Card ID.
+- Current status.
 - Source name.
 - Source type.
+- Published date.
 - Headline.
-- Main claim.
-- Short excerpt.
-- Credibility signal.
-- Published date when available.
-- Source link when available.
+- Claim.
+- Excerpt.
+- Credibility signal or action text.
+- Source link when a URL exists.
 
-The lie should not look obviously fake. It should usually be a truthful source
-with one small but meaningful distortion, such as:
+Remaining cards are selectable. Cleared cards stay visible but disabled.
 
-- `may` becoming `always`.
-- `some` becoming `all`.
-- An association becoming a guarantee.
-- A caveat being removed.
-- A narrow finding being applied too broadly.
+### Card Result
 
-### Card Reveal Interaction
+When a card is selected, the widget flips the card and calls
+`guess_sus_source`.
 
-When the user selects a card, the UI should treat the card itself as the
-interactive object. The preferred interaction is:
+Truth result:
 
-1. The user taps or clicks the card.
-2. The card animates with a flip or spin.
-3. The back of the card reveals the result.
+- The card is cleared.
+- The card explanation is exposed.
+- The player can keep guessing.
+- Score tracks the wrong guess.
 
-Truth card back:
+Lie result:
 
-- Shows that the card is truthful.
-- Explains why the claim is supported.
-- Marks the card as cleared.
-- Keeps the remaining suspect cards available for the next guess.
+- The round is won.
+- Full reveal data is returned.
+- The score result is persisted to D1.
+- The summary shows the false spin and all card explanations.
 
-Lie card back:
+### Optional Clue
 
-- Shows that the card is the lie.
-- Explains the exact false spin.
-- Shows what the original evidence supported.
-- Ends the round and opens the post-round summary.
+`ask_question` is not part of the main click flow. It can be called by ChatGPT or
+an MCP client when the player explicitly wants a clue.
 
-### Optional Clue Questions
+The answer uses Exa Answer when available. If Exa fails or is not configured,
+Sus returns local clue hints from the remaining cards.
 
-The main game loop should not force a search or question after a wrong guess.
-If the player explicitly asks for a clue, the answer should help compare
-remaining cards without directly naming the lie unless the evidence makes the
-answer unavoidable.
+### Summary
 
-Good question examples:
+The summary shows:
 
-- What wording should I compare next?
-- Which card has the strongest overclaim?
-- Are any of these claims confusing association with causation?
-- Which caveat matters most for this topic?
-- What source detail should I verify before guessing?
+- Case status.
+- Topic.
+- Points and grade for wins.
+- Wrong-guess count.
+- Question count.
+- Cards reviewed.
+- Earned badges.
+- The sus source.
+- Explanation for every card.
+- New case action.
+- Close action.
 
-The answer should come from Exa Answer or Exa-backed evidence, then the user
-returns to the card board with cleared cards disabled.
+## Game State
 
-### Round Summary
+The implemented `GameState` contains:
 
-After the lie is found, Sus shows the round result.
+- `session`.
+- `status`: `idle`, `welcome`, `active`, `won`, `revealed`, or `quit`.
+- `round`.
+- `eliminatedIds`.
+- `pendingQuestion`.
+- `guesses`.
+- `questions`.
+- `assets`.
+- `score`.
 
-The summary should include:
+The current tools set `idle`, `welcome`, `active`, `won`, and `revealed`. The
+`quit` status exists in the type but no current tool sets it.
 
-- The topic.
-- The lie card.
-- The exact false spin.
-- Why the other cards were truthful.
-- Number of wrong guesses.
-- Number of questions asked.
-- A play again action that returns to the welcome page.
-- A quit action.
+## Scoring
 
-## State Model
+Scoring is implemented in `src/game.ts`.
 
-Sus needs enough state to keep the board interactive across ChatGPT and MCP tool
-calls.
+- Base win: 1000 points.
+- Wrong guess penalty: 220 points.
+- Question penalty: 80 points.
+- Clean read bonus: 350 points.
+- No-clue bonus: 150 points.
+- Streak bonus: 125 points per current streak, capped at 500.
+- Comeback bonus: 120 points after two or more mistakes.
+- Minimum win score: 150 points.
+- Reveal outcome: 0 points and streak reset.
 
-Core session state:
+Ranks are:
 
-- Session id.
-- Current status: welcome, active, won, or quit.
-- Current topic.
-- Five source cards.
-- Lie card id.
-- Cleared card ids.
-- Guess history.
-- Question history.
-- Round result.
+- New Investigator.
+- Caveat Spotter.
+- Source Sleuth.
+- Signal Analyst.
+- Truth Editor.
 
-Card states:
+Badges are awarded for first case, clean reads, no-clue solves, perfect reads,
+comebacks, elimination wins, hot streaks, and clue-heavy wins.
 
-- `unselected`: card is still a suspect.
-- `selected`: card is currently being evaluated.
-- `cleared`: card was guessed and proven truthful.
-- `lie-found`: card was guessed and proven to be the lie.
+## MCP Tool Responsibilities
 
-## MCP Responsibilities
+- `get_rules` returns rules and starter behavior.
+- `list_topics` returns bundled starter topic names and aliases.
+- `start_game` starts or resumes a session and returns welcome state.
+- `render_source_cards` returns widget-ready state for the current session.
+- `start_round` creates a topic, starter, or custom round.
+- `get_round` returns the active public round, guesses, questions, and score.
+- `generate_round_asset` creates or reuses a Workers AI image for the round.
+- `guess_sus_source` evaluates a card accusation.
+- `ask_question` records a clue question and answer.
+- `reveal_round` reveals the answer and records a zero-point reveal if unsolved.
+- `get_leaderboard` reads D1 standings.
+- `reset_game` returns to welcome and can optionally clear score.
 
-ChatGPT should guide the player and render the UI, but the Sus Agent MCP server
-should own the rules.
+## Persistence
 
-The server should:
+D1 tables are defined in `migrations/0001_leaderboard.sql`:
 
-- Start a session.
-- Render the welcome UI.
-- Accept the user's topic.
-- Request sources from Exa.
-- Normalize Exa results into five source cards.
-- Choose one card to spin into the lie.
-- Persist the round state.
-- Evaluate guesses.
-- Track cleared cards and remaining suspects.
-- Answer optional clue questions when explicitly requested.
-- Reveal the round once the lie is found.
-- Reset to the welcome page for another game.
-- Quit the session when requested.
+- `players`.
+- `round_results`.
+- `player_scores`.
 
-## UX Rules
+Completed wins and reveals are persisted. Active in-progress state remains in
+the Agent/Durable Object state, not in D1.
 
-- The player should never need to memorize rules before starting.
-- The board should make comparison easy: five cards, consistent fields, clear
-  source signals.
-- The lie should be subtle, not silly.
-- Wrong guesses should feel useful because they narrow the suspect pool.
-- The card flip should reveal the result without replacing the whole board.
-- Cleared cards should stay visible but disabled, so the player can compare
-  what has already been ruled out.
-- The game should always offer a clear next action: guess again, play again, or
-  quit.
+## Current Non-Goals
+
+- The generated image is stored in Agent state as a data URI, not R2.
+- `futureAssets.clipUrl` is always `null`.
+- There is no standalone browser game route beyond the minimal `/` shell.
+- The source-card widget is the primary product surface.

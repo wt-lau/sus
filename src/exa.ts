@@ -3,6 +3,7 @@ import type { SourceCard, SourceSeed } from "./game";
 const EXA_SEARCH_URL = "https://api.exa.ai/search";
 const EXA_ANSWER_URL = "https://api.exa.ai/answer";
 const SOURCE_COUNT = 5;
+const SOURCE_SEARCH_RESULT_COUNT = 25;
 
 export type ExaSourceSearch = {
   query: string;
@@ -58,57 +59,41 @@ export async function searchTopicSourcesWithExa(
     throw new ExaSourceSearchError("A topic is required for Exa search.");
   }
 
-  const query = [
-    `Find credible source material about ${cleanedTopic}.`,
-    "Prioritize public agencies, research institutions, data-heavy explainers, and careful reporting.",
-    "Favor bounded factual claims with caveats, mechanisms, dates, and source-specific evidence."
-  ].join(" ");
+  const queries = buildSourceSearchQueries(cleanedTopic);
+  const sources: SourceSeed[] = [];
+  const seenSourceKeys = new Set<string>();
+  const requestIds: string[] = [];
 
-  const response = await fetch(EXA_SEARCH_URL, {
-    method: "POST",
-    headers: {
-      "content-type": "application/json",
-      "x-api-key": apiKey
-    },
-    body: JSON.stringify({
-      query,
-      type: "auto",
-      numResults: 10,
-      contents: {
-        highlights: {
-          query: `Specific, source-backed claims about ${cleanedTopic}. Include limits, caveats, mechanisms, or evidence quality.`,
-          maxCharacters: 900
-        },
-        livecrawlTimeout: 8000,
-        maxAgeHours: 24
-      }
-    })
-  });
+  for (const query of queries) {
+    const payload = await fetchSourceSearchPayload(query, cleanedTopic, apiKey);
+    const requestId = readString(payload.requestId);
+    if (requestId) requestIds.push(requestId);
 
-  if (!response.ok) {
-    throw new ExaSourceSearchError(
-      `Exa search failed with HTTP ${response.status}.`,
-      response.status,
-      await readResponseDetails(response)
+    collectSourceSeeds(
+      sources,
+      seenSourceKeys,
+      Array.isArray(payload.results) ? payload.results : [],
+      cleanedTopic
     );
-  }
 
-  const payload = asRecord(await response.json());
-  const results = Array.isArray(payload.results) ? payload.results : [];
-  const sources = results
-    .map((result) => sourceSeedFromResult(result, cleanedTopic))
-    .filter((source): source is SourceSeed => Boolean(source))
-    .slice(0, SOURCE_COUNT);
+    if (sources.length === SOURCE_COUNT) {
+      return {
+        query: queries[0],
+        requestId: requestIds.join(", ") || undefined,
+        sources
+      };
+    }
+  }
 
   if (sources.length !== SOURCE_COUNT) {
     throw new ExaSourceSearchError(
-      `Exa returned ${sources.length} usable source cards; ${SOURCE_COUNT} are required.`
+      `Exa returned ${sources.length} usable source cards after retrying; ${SOURCE_COUNT} are required.`
     );
   }
 
   return {
-    query,
-    requestId: readString(payload.requestId),
+    query: queries[0],
+    requestId: requestIds.join(", ") || undefined,
     sources
   };
 }
@@ -185,6 +170,81 @@ async function readResponseDetails(response: Response) {
   }
 }
 
+function buildSourceSearchQueries(topic: string) {
+  return [
+    [
+      `Find credible source material about ${topic}.`,
+      "Prioritize public agencies, research institutions, data-heavy explainers, and careful reporting.",
+      "Favor bounded factual claims with caveats, mechanisms, dates, and source-specific evidence."
+    ].join(" "),
+    [
+      `Find additional source-backed evidence about ${topic}.`,
+      "Prefer official reports, research papers, reputable news analysis, and pages with concrete numbers or dates.",
+      "Avoid duplicate domains when possible and return sources with enough excerptable text for a source-checking game."
+    ].join(" ")
+  ];
+}
+
+async function fetchSourceSearchPayload(
+  query: string,
+  topic: string,
+  apiKey: string
+) {
+  const response = await fetch(EXA_SEARCH_URL, {
+    method: "POST",
+    headers: {
+      "content-type": "application/json",
+      "x-api-key": apiKey
+    },
+    body: JSON.stringify({
+      query,
+      type: "auto",
+      numResults: SOURCE_SEARCH_RESULT_COUNT,
+      contents: {
+        highlights: true,
+        text: {
+          maxCharacters: 1200
+        },
+        summary: {
+          query: `Summarize one bounded, source-backed claim about ${topic}. Include limits, caveats, mechanisms, dates, or evidence quality when present.`
+        },
+        livecrawlTimeout: 8000,
+        maxAgeHours: 24
+      }
+    })
+  });
+
+  if (!response.ok) {
+    throw new ExaSourceSearchError(
+      `Exa search failed with HTTP ${response.status}.`,
+      response.status,
+      await readResponseDetails(response)
+    );
+  }
+
+  return asRecord(await response.json());
+}
+
+function collectSourceSeeds(
+  sources: SourceSeed[],
+  seenSourceKeys: Set<string>,
+  results: unknown[],
+  topic: string
+) {
+  for (const result of results) {
+    if (sources.length === SOURCE_COUNT) return;
+
+    const source = sourceSeedFromResult(result, topic);
+    if (!source) continue;
+
+    const sourceKey = sourceKeyForSeed(source);
+    if (seenSourceKeys.has(sourceKey)) continue;
+
+    seenSourceKeys.add(sourceKey);
+    sources.push(source);
+  }
+}
+
 function buildAnswerQuery(args: {
   topic: string;
   question: string;
@@ -224,10 +284,15 @@ function sourceSeedFromResult(
   const record = asRecord(result);
   const url = readString(record.url);
   const host = url ? hostnameForUrl(url) : null;
-  const headline = readString(record.title);
+  const headline = firstPresent(
+    readString(record.title),
+    url ? readableTitleFromUrl(url) : null,
+    host
+  );
   const highlights = readHighlights(record.highlights);
   const bodyText = readString(record.text);
-  const excerpt = firstPresent(highlights[0], bodyText, headline);
+  const summary = readString(record.summary);
+  const excerpt = firstPresent(...highlights, summary, bodyText, headline);
 
   if (!url || !host || !headline || !excerpt) {
     return null;
@@ -249,6 +314,21 @@ function sourceSeedFromResult(
     ),
     url
   };
+}
+
+function sourceKeyForSeed(source: SourceSeed) {
+  if (source.url) {
+    try {
+      const url = new URL(source.url);
+      url.hash = "";
+      url.search = "";
+      return url.toString().replace(/\/$/, "").toLowerCase();
+    } catch {
+      return source.url.toLowerCase();
+    }
+  }
+
+  return `${source.sourceName}:${source.headline}`.toLowerCase();
 }
 
 function citationFromResult(result: unknown): ExaAnswerCitation | null {
@@ -334,6 +414,28 @@ function hostnameForUrl(url: string) {
   } catch {
     return null;
   }
+}
+
+function readableTitleFromUrl(url: string) {
+  try {
+    const parsedUrl = new URL(url);
+    const lastSegment =
+      parsedUrl.pathname
+        .split("/")
+        .filter(Boolean)
+        .pop()
+        ?.replace(/\.[a-z0-9]+$/i, "")
+        .replace(/[-_]+/g, " ")
+        .trim() || null;
+
+    return lastSegment ? titleCase(lastSegment) : parsedUrl.hostname;
+  } catch {
+    return null;
+  }
+}
+
+function titleCase(value: string) {
+  return value.replace(/\b[a-z]/g, (letter) => letter.toUpperCase());
 }
 
 function firstSentence(text: string) {

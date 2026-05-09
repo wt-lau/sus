@@ -1,4 +1,4 @@
-export const SUS_WIDGET_URI = "ui://widget/sus-source-cards-v8.html";
+export const SUS_WIDGET_URI = "ui://widget/sus-source-cards-v9.html";
 export const SUS_WIDGET_MIME_TYPE = "text/html;profile=mcp-app";
 
 export const SUS_WIDGET_HTML = `<!doctype html>
@@ -742,7 +742,9 @@ export const SUS_WIDGET_HTML = `<!doctype html>
       .card-inner {
         position: relative;
         width: 100%;
-        min-height: 320px;
+        min-height: 340px;
+        display: grid;
+        grid-template-areas: "stack";
         transform-style: preserve-3d;
         transition: transform 520ms cubic-bezier(0.4, 0, 0.2, 1);
       }
@@ -752,6 +754,7 @@ export const SUS_WIDGET_HTML = `<!doctype html>
       }
 
       .card-face {
+        grid-area: stack;
         background: var(--surface-card);
         border: 1px solid var(--border-soft);
         border-radius: var(--radius-md);
@@ -761,14 +764,12 @@ export const SUS_WIDGET_HTML = `<!doctype html>
         gap: 14px;
         backface-visibility: hidden;
         -webkit-backface-visibility: hidden;
-        min-height: 320px;
+        min-height: 340px;
         transition: border-color 200ms ease, box-shadow 200ms ease,
           transform 200ms ease;
       }
 
       .card-back {
-        position: absolute;
-        inset: 0;
         transform: rotateY(180deg);
       }
 
@@ -943,6 +944,155 @@ export const SUS_WIDGET_HTML = `<!doctype html>
         font-size: 13px;
         line-height: 1.55;
         color: var(--ink-secondary);
+      }
+
+      /* Verdict body — pull-quote of the claim */
+      .verdict-quote {
+        margin: 4px 0 0;
+        padding: 0 0 0 12px;
+        border-left: 1px solid var(--border-soft);
+        font-family: var(--font-display);
+        font-style: italic;
+        font-weight: 400;
+        font-size: 13.5px;
+        line-height: 1.45;
+        color: var(--ink-secondary);
+        letter-spacing: -0.003em;
+        text-wrap: balance;
+        overflow-wrap: anywhere;
+      }
+
+      .card.lie .verdict-quote {
+        border-left-color: var(--lie-border);
+        color: var(--ink-primary);
+      }
+
+      .card.truth .verdict-quote,
+      .card.cleared .verdict-quote {
+        border-left-color: var(--truth-border);
+      }
+
+      /* The tell — credibilitySignal with numbered marker */
+      .verdict-tell {
+        display: grid;
+        grid-template-columns: 18px minmax(0, 1fr);
+        gap: 10px;
+        align-items: baseline;
+        font-size: 12px;
+        line-height: 1.45;
+        color: var(--ink-secondary);
+        margin: 0;
+        padding-top: 10px;
+        border-top: 1px solid var(--border-hairline);
+      }
+
+      .verdict-tell .num {
+        font-family: var(--font-display);
+        font-style: italic;
+        font-weight: 500;
+        font-size: 14px;
+        text-align: right;
+        line-height: 1;
+        color: var(--accent);
+      }
+
+      .card.truth .verdict-tell .num,
+      .card.cleared .verdict-tell .num {
+        color: var(--truth);
+      }
+
+      /* Spin-type tag */
+      .spin-tag {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        font-size: 10px;
+        letter-spacing: 0.14em;
+        text-transform: uppercase;
+        font-weight: 600;
+        color: var(--accent);
+        margin-top: 2px;
+      }
+
+      .spin-tag::before {
+        content: "";
+        width: 12px;
+        height: 1px;
+        background: currentColor;
+      }
+
+      .card.truth .spin-tag,
+      .card.cleared .spin-tag {
+        color: var(--truth);
+      }
+
+      /* Pending state — four-question lens */
+      .pending-claim {
+        font-family: var(--font-display);
+        font-style: italic;
+        font-size: 13.5px;
+        line-height: 1.45;
+        color: var(--ink-tertiary);
+        border-left: 1px dashed var(--border-soft);
+        padding-left: 12px;
+        margin: 4px 0 0;
+        text-wrap: balance;
+        overflow-wrap: anywhere;
+      }
+
+      .lens-rule {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        margin-top: 2px;
+      }
+
+      .lens-rule span {
+        font-size: 10px;
+        font-weight: 600;
+        letter-spacing: 0.18em;
+        text-transform: uppercase;
+        color: var(--accent);
+      }
+
+      .lens-rule::after {
+        content: "";
+        flex: 1;
+        height: 1px;
+        background: var(--border-hairline);
+      }
+
+      .lens-prompts {
+        display: grid;
+        gap: 7px;
+        margin: 2px 0 0;
+        padding: 0;
+        list-style: none;
+      }
+
+      .lens-prompts li {
+        display: grid;
+        grid-template-columns: 14px minmax(0, 1fr);
+        gap: 10px;
+        align-items: baseline;
+        font-size: 12px;
+        line-height: 1.4;
+        color: var(--ink-secondary);
+      }
+
+      .lens-prompts li::before {
+        content: "";
+        width: 6px;
+        height: 6px;
+        border-radius: 50%;
+        border: 1px solid var(--ink-tertiary);
+        margin-top: 5px;
+      }
+
+      .lens-prompts em {
+        font-style: italic;
+        color: var(--ink-primary);
+        font-weight: 500;
       }
 
       /* Audit (checking) state */
@@ -1416,6 +1566,338 @@ export const SUS_WIDGET_HTML = `<!doctype html>
           animation: none;
         }
       }
+
+      /* Leaderboard — utility nav, hero, standing card, standings list */
+      .shell-utility {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 12px;
+        padding-bottom: 4px;
+      }
+
+      .utility-link {
+        background: transparent;
+        border: 1px solid transparent;
+        border-radius: 999px;
+        padding: 7px 13px 7px 11px;
+        font-size: 12px;
+        font-weight: 600;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        color: var(--ink-primary);
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        cursor: pointer;
+        transition: background 140ms ease, color 140ms ease, border-color 140ms ease;
+      }
+      .utility-link:hover {
+        background: var(--surface-card);
+        border-color: var(--ink-primary);
+      }
+      .utility-link .glyph {
+        font-family: var(--font-display);
+        font-style: italic;
+        font-weight: 500;
+        font-size: 14px;
+        line-height: 1;
+        letter-spacing: 0;
+        color: var(--accent);
+        transform: translateY(-0.5px);
+      }
+      .utility-meta {
+        font-size: 11px;
+        font-weight: 500;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+        color: var(--ink-tertiary);
+        font-feature-settings: "tnum";
+      }
+
+      .leaderboard {
+        display: grid;
+        gap: 32px;
+        max-width: 720px;
+        margin: 0 auto;
+      }
+      .leaderboard-hero h1 {
+        font-family: var(--font-display);
+        font-weight: 500;
+        font-size: clamp(36px, 6vw, 56px);
+        line-height: 1.04;
+        letter-spacing: -0.022em;
+        margin-bottom: 18px;
+        text-wrap: balance;
+      }
+      .leaderboard-hero h1 em {
+        color: var(--accent);
+        font-style: italic;
+        font-weight: 500;
+      }
+      .leaderboard-hero .lede {
+        color: var(--ink-secondary);
+        font-size: 17px;
+        line-height: 1.55;
+        max-width: 580px;
+      }
+
+      .standing-card {
+        background: linear-gradient(
+          180deg,
+          var(--surface-card),
+          var(--accent-soft)
+        );
+        border: 1px solid var(--accent-strong);
+        border-radius: var(--radius-md);
+        padding: 22px 24px;
+        display: grid;
+        gap: 14px;
+      }
+      .standing-card-top {
+        display: flex;
+        align-items: baseline;
+        justify-content: space-between;
+        gap: 16px;
+        flex-wrap: wrap;
+      }
+      .standing-card-top .kicker {
+        color: var(--accent);
+      }
+      .standing-card-grid {
+        display: grid;
+        grid-template-columns: auto minmax(0, 1fr) auto;
+        gap: 22px;
+        align-items: center;
+      }
+      .standing-rank {
+        font-family: var(--font-display);
+        font-weight: 500;
+        font-style: italic;
+        font-size: 56px;
+        line-height: 0.92;
+        color: var(--accent);
+        font-feature-settings: "tnum", "lnum";
+        letter-spacing: -0.02em;
+      }
+      .standing-rank .of {
+        font-size: 14px;
+        color: var(--ink-tertiary);
+        font-style: normal;
+        font-weight: 500;
+        letter-spacing: 0.04em;
+        margin-left: 6px;
+      }
+      .standing-name {
+        font-family: var(--font-display);
+        font-weight: 500;
+        font-size: 26px;
+        line-height: 1.15;
+        letter-spacing: -0.012em;
+      }
+      .standing-meta {
+        color: var(--ink-secondary);
+        font-size: 13px;
+        margin-top: 6px;
+        line-height: 1.55;
+      }
+      .standing-points {
+        font-family: var(--font-display);
+        font-weight: 500;
+        font-size: 38px;
+        line-height: 1;
+        font-feature-settings: "tnum", "lnum";
+        letter-spacing: -0.018em;
+        text-align: right;
+      }
+      .standing-points-label {
+        font-size: 11px;
+        font-weight: 600;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+        color: var(--ink-tertiary);
+        text-align: right;
+        margin-top: 6px;
+      }
+      .standing-progress {
+        border-top: 1px solid var(--accent-strong);
+        padding-top: 14px;
+        font-size: 13px;
+        color: var(--ink-secondary);
+        line-height: 1.5;
+      }
+      .standing-progress strong {
+        font-family: var(--font-display);
+        font-weight: 500;
+        color: var(--ink-primary);
+        font-feature-settings: "tnum", "lnum";
+      }
+
+      .standings {
+        display: grid;
+        gap: 0;
+      }
+      .standings-header {
+        display: flex;
+        align-items: baseline;
+        justify-content: space-between;
+        gap: 12px;
+        padding-bottom: 12px;
+        border-bottom: 1px solid var(--border-hairline);
+        margin-bottom: 4px;
+      }
+      .standings-list {
+        display: grid;
+        gap: 0;
+        list-style: none;
+        margin: 0;
+        padding: 0;
+      }
+      .standings-row {
+        display: grid;
+        grid-template-columns: 56px minmax(0, 1fr) auto;
+        align-items: center;
+        gap: 18px;
+        padding: 16px 0;
+        border-bottom: 1px solid var(--border-hairline);
+        position: relative;
+        transition: background 140ms ease;
+      }
+      .standings-row:hover {
+        background: var(--surface-subtle);
+      }
+      .standings-row.is-current {
+        background: var(--accent-soft);
+        margin: 0 -16px;
+        padding-left: 16px;
+        padding-right: 16px;
+        border-radius: var(--radius-md);
+        border: 1px solid var(--accent-strong);
+      }
+
+      .standings-rank {
+        font-family: var(--font-display);
+        font-weight: 500;
+        font-size: 26px;
+        line-height: 1;
+        color: var(--ink-tertiary);
+        font-feature-settings: "tnum", "lnum";
+        letter-spacing: -0.005em;
+      }
+      .standings-row.is-top .standings-rank,
+      .standings-row.is-current .standings-rank {
+        color: var(--accent);
+        font-style: italic;
+      }
+
+      .standings-person {
+        display: grid;
+        gap: 4px;
+        min-width: 0;
+      }
+      .standings-name {
+        font-family: var(--font-display);
+        font-weight: 500;
+        font-size: 19px;
+        line-height: 1.2;
+        letter-spacing: -0.011em;
+        color: var(--ink-primary);
+        display: flex;
+        align-items: baseline;
+        gap: 10px;
+        flex-wrap: wrap;
+      }
+      .standings-name .you-pill {
+        font-family: var(--font-sans);
+        font-style: normal;
+        font-size: 10px;
+        font-weight: 600;
+        letter-spacing: 0.14em;
+        text-transform: uppercase;
+        color: var(--accent);
+        background: transparent;
+        border: 1px solid var(--accent-strong);
+        border-radius: 999px;
+        padding: 2px 8px 3px;
+        line-height: 1;
+      }
+      .standings-meta {
+        color: var(--ink-tertiary);
+        font-size: 12px;
+        line-height: 1.45;
+        font-feature-settings: "tnum";
+        display: flex;
+        flex-wrap: wrap;
+        gap: 14px;
+      }
+      .standings-meta strong {
+        color: var(--ink-secondary);
+        font-weight: 600;
+        font-feature-settings: "tnum", "lnum";
+      }
+
+      .standings-points-cell {
+        text-align: right;
+        display: grid;
+        gap: 2px;
+      }
+      .standings-points {
+        font-family: var(--font-display);
+        font-weight: 500;
+        font-size: 22px;
+        line-height: 1;
+        letter-spacing: -0.012em;
+        font-feature-settings: "tnum", "lnum";
+      }
+      .standings-points-suffix {
+        color: var(--ink-tertiary);
+        font-size: 11px;
+        font-weight: 600;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+      }
+
+      .standings-foot {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 16px;
+        margin-top: 8px;
+      }
+      .standings-foot .meta {
+        color: var(--ink-tertiary);
+        font-size: 12px;
+        font-style: italic;
+        font-family: var(--font-display);
+      }
+
+      .standings-loading {
+        padding: 40px 0;
+        text-align: center;
+        color: var(--ink-tertiary);
+        font-style: italic;
+        font-family: var(--font-display);
+        font-size: 14px;
+      }
+
+      @media (max-width: 640px) {
+        .standings-row {
+          grid-template-columns: 40px minmax(0, 1fr) auto;
+          gap: 12px;
+        }
+        .standing-card-grid {
+          grid-template-columns: auto 1fr;
+        }
+        .standings-points {
+          font-size: 19px;
+        }
+        .standing-rank {
+          font-size: 44px;
+        }
+        .standing-points {
+          font-size: 30px;
+        }
+      }
     </style>
   </head>
   <body>
@@ -1433,11 +1915,23 @@ export const SUS_WIDGET_HTML = `<!doctype html>
       const state = {
         game: window.openai && window.openai.toolOutput ? window.openai.toolOutput : null,
         topic: savedUiState.topic || "",
+        carouselCardId: savedUiState.carouselCardId || "",
+        carouselScrollLeft:
+          typeof savedUiState.carouselScrollLeft === "number"
+            ? savedUiState.carouselScrollLeft
+            : 0,
         flippingCardId: "",
         busy: "",
-        error: ""
+        error: "",
+        // "" follows the game state; "leaderboard" overrides welcome
+        // with the standings view. Only valid when no round is active.
+        view: "",
+        leaderboard: null,
+        leaderboardError: "",
+        leaderboardLoading: false
       };
       let gameSignature = serializeGame(state.game);
+      let carouselPersistTimer = 0;
 
       function getStructuredContent(result) {
         if (!result) return null;
@@ -1529,13 +2023,40 @@ export const SUS_WIDGET_HTML = `<!doctype html>
               name === "start_round" ||
               name === "reset_game"
             ) {
-              state.flippingCardId = "";
+              resetCarouselState();
             }
           }
         } catch (error) {
           state.error = error.message || String(error);
         } finally {
           state.busy = "";
+          render();
+        }
+      }
+
+      // Fetch the leaderboard snapshot without clobbering game state.
+      // get_leaderboard returns the same shape as game tools but its job is
+      // sideband — we keep it in state.leaderboard so the welcome/round
+      // views remain untouched when the user is just peeking at standings.
+      async function loadLeaderboard() {
+        state.leaderboardLoading = true;
+        state.leaderboardError = "";
+        render();
+        try {
+          const result = await callTool("get_leaderboard", { limit: 10 });
+          if (result && result.leaderboard) {
+            state.leaderboard = result.leaderboard;
+          } else if (result && result.status === "leaderboard-unavailable") {
+            state.leaderboardError =
+              result.message ||
+              "Leaderboard is not available yet. Finish a round to create an entry.";
+          } else {
+            state.leaderboardError = "Could not load the standings.";
+          }
+        } catch (error) {
+          state.leaderboardError = error.message || String(error);
+        } finally {
+          state.leaderboardLoading = false;
           render();
         }
       }
@@ -1553,9 +2074,130 @@ export const SUS_WIDGET_HTML = `<!doctype html>
         }
         window.openai.setWidgetState({
           privateContent: {
-            topic: state.topic
+            topic: state.topic,
+            carouselCardId: state.carouselCardId,
+            carouselScrollLeft: state.carouselScrollLeft
           }
         });
+      }
+
+      function resetCarouselState() {
+        state.carouselCardId = "";
+        state.carouselScrollLeft = 0;
+        state.flippingCardId = "";
+        persistUiState();
+      }
+
+      function getCarouselCards(carousel) {
+        return Array.from(carousel.querySelectorAll(".card[data-card-id]"));
+      }
+
+      function findCarouselCard(carousel, cardId) {
+        if (!cardId) return null;
+        return (
+          getCarouselCards(carousel).find(
+            (card) => card.getAttribute("data-card-id") === cardId
+          ) || null
+        );
+      }
+
+      function getMostVisibleCarouselCardId(carousel) {
+        const carouselRect = carousel.getBoundingClientRect();
+        let bestCardId = "";
+        let bestVisibleWidth = 0;
+
+        getCarouselCards(carousel).forEach((card) => {
+          const rect = card.getBoundingClientRect();
+          const visibleWidth = Math.max(
+            0,
+            Math.min(rect.right, carouselRect.right) -
+              Math.max(rect.left, carouselRect.left)
+          );
+
+          if (visibleWidth > bestVisibleWidth) {
+            bestVisibleWidth = visibleWidth;
+            bestCardId = card.getAttribute("data-card-id") || "";
+          }
+        });
+
+        return bestCardId;
+      }
+
+      function captureCarousel() {
+        const carousel = root.querySelector("[data-card-carousel]");
+        if (!carousel) {
+          return {
+            cardId: state.carouselCardId,
+            scrollLeft: state.carouselScrollLeft
+          };
+        }
+
+        const cardId =
+          getMostVisibleCarouselCardId(carousel) || state.carouselCardId;
+        return {
+          cardId,
+          scrollLeft: carousel.scrollLeft
+        };
+      }
+
+      function rememberCarouselPosition(cardId) {
+        const carousel = root.querySelector("[data-card-carousel]");
+        if (carousel) {
+          state.carouselScrollLeft = carousel.scrollLeft;
+          state.carouselCardId =
+            cardId || getMostVisibleCarouselCardId(carousel) || state.carouselCardId;
+        } else if (cardId) {
+          state.carouselCardId = cardId;
+        }
+        persistUiState();
+      }
+
+      function restoreCarousel(snapshot) {
+        const carousel = root.querySelector("[data-card-carousel]");
+        if (!carousel) return;
+
+        const applyPosition = () => {
+          const scrollLeft =
+            snapshot && typeof snapshot.scrollLeft === "number"
+              ? snapshot.scrollLeft
+              : state.carouselScrollLeft;
+          const cardId =
+            (snapshot && snapshot.cardId) ||
+            state.carouselCardId ||
+            state.flippingCardId;
+
+          if (typeof scrollLeft === "number") {
+            carousel.scrollLeft = scrollLeft;
+          }
+
+          const card = findCarouselCard(carousel, cardId);
+          if (!card) return;
+
+          const carouselRect = carousel.getBoundingClientRect();
+          const cardRect = card.getBoundingClientRect();
+          const visibleWidth = Math.max(
+            0,
+            Math.min(cardRect.right, carouselRect.right) -
+              Math.max(cardRect.left, carouselRect.left)
+          );
+          const requiredWidth = Math.min(cardRect.width, carouselRect.width) * 0.6;
+
+          if (visibleWidth >= requiredWidth) return;
+
+          const maxScrollLeft = Math.max(
+            0,
+            carousel.scrollWidth - carousel.clientWidth
+          );
+          carousel.scrollLeft = Math.min(
+            Math.max(card.offsetLeft - carousel.offsetLeft, 0),
+            maxScrollLeft
+          );
+        };
+
+        applyPosition();
+        if (typeof window.requestAnimationFrame === "function") {
+          window.requestAnimationFrame(applyPosition);
+        }
       }
 
       function getSuggestions(game) {
@@ -1630,6 +2272,7 @@ export const SUS_WIDGET_HTML = `<!doctype html>
 
       function render() {
         const focusSnapshot = captureFocus();
+        const carouselSnapshot = captureCarousel();
         const game = state.game || {};
         syncPrefill(game);
         const reveal = game.reveal || null;
@@ -1654,10 +2297,13 @@ export const SUS_WIDGET_HTML = `<!doctype html>
         }
 
         if (!round) {
-          root.innerHTML =
-            '<main class="shell shell-welcome">' +
-            renderWelcome(game, status) +
-            "</main>";
+          const welcomeMarkup =
+            state.view === "leaderboard"
+              ? '<main class="shell">' + renderLeaderboard(game) + "</main>"
+              : '<main class="shell shell-welcome">' +
+                renderWelcome(game, status) +
+                "</main>";
+          root.innerHTML = welcomeMarkup;
           bindEvents();
           restoreFocus(focusSnapshot);
           notifyHeight();
@@ -1686,6 +2332,7 @@ export const SUS_WIDGET_HTML = `<!doctype html>
 
         bindEvents();
         restoreFocus(focusSnapshot);
+        restoreCarousel(carouselSnapshot);
         notifyHeight();
       }
 
@@ -1698,6 +2345,13 @@ export const SUS_WIDGET_HTML = `<!doctype html>
           (status === "exa-search-failed" ? game.message || "" : "");
 
         return [
+          '<div class="shell-utility">',
+          '<span class="utility-meta">Sus · welcome</span>',
+          '<button type="button" class="utility-link" data-action="open-leaderboard" aria-label="Open leaderboard">',
+          'Leaderboard',
+          '<span class="glyph" aria-hidden="true">↗</span>',
+          '</button>',
+          '</div>',
           '<div class="welcome">',
           '<header class="welcome-mark">',
           '<div class="brand-mark"><img src="data:image/png;base64,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" alt="" width="44" height="44" decoding="async" loading="eager" /></div>',
@@ -1770,6 +2424,219 @@ export const SUS_WIDGET_HTML = `<!doctype html>
           ),
           "</ol>",
           "</div>",
+          "</div>"
+        ].join("");
+      }
+
+      function formatPoints(value) {
+        const n = Number(value || 0);
+        if (!Number.isFinite(n)) return "0";
+        return n.toLocaleString("en-US");
+      }
+
+      function pad2(n) {
+        return String(n).padStart(2, "0");
+      }
+
+      function formatRelativeUpdated(iso) {
+        if (!iso) return "";
+        const then = Date.parse(iso);
+        if (!Number.isFinite(then)) return "";
+        const seconds = Math.max(0, Math.round((Date.now() - then) / 1000));
+        if (seconds < 60) return "Updated just now";
+        const minutes = Math.round(seconds / 60);
+        if (minutes < 60) return "Updated " + minutes + " min ago";
+        const hours = Math.round(minutes / 60);
+        if (hours < 24) return "Updated " + hours + " hr ago";
+        const days = Math.round(hours / 24);
+        return "Updated " + days + " day" + (days === 1 ? "" : "s") + " ago";
+      }
+
+      function renderStandingMeta(entry) {
+        const parts = [
+          '<span><strong>' +
+            html(String(entry.wins || 0)) +
+            "</strong> " +
+            html((entry.wins || 0) === 1 ? "win" : "wins") +
+            "</span>",
+          '<span>streak <strong>' +
+            html(String(entry.bestStreak || 0)) +
+            "</strong></span>"
+        ];
+        if (entry.perfectRounds && entry.perfectRounds > 0) {
+          parts.push(
+            '<span><strong>' +
+              html(String(entry.perfectRounds)) +
+              "</strong> clean read" +
+              (entry.perfectRounds === 1 ? "" : "s") +
+              "</span>"
+          );
+        }
+        return parts.join("");
+      }
+
+      function renderStandingCard(snapshot, score) {
+        const me = snapshot && snapshot.currentPlayer;
+        if (!me) return "";
+
+        const total = (snapshot.entries || []).length;
+        const rank = me.rank || 0;
+        const ofText = total > 0 ? "/" + total : "";
+        const rankLabel =
+          (score && score.rank && score.rank.label) || "";
+        const nextLabel =
+          (score && score.rank && score.rank.nextLabel) || "";
+        const pointsToNext =
+          (score && score.rank && score.rank.pointsToNext) || 0;
+
+        const fullMeta = [
+          (me.wins || 0) + " win" + ((me.wins || 0) === 1 ? "" : "s"),
+          "streak " + (me.bestStreak || 0),
+          (me.perfectRounds || 0) +
+            " clean read" +
+            ((me.perfectRounds || 0) === 1 ? "" : "s")
+        ].join(" · ");
+
+        const progressLine =
+          nextLabel && pointsToNext > 0
+            ? '<p class="standing-progress"><strong>' +
+              html(formatPoints(pointsToNext)) +
+              "</strong> points to <strong>" +
+              html(nextLabel) +
+              "</strong></p>"
+            : nextLabel
+              ? ""
+              : '<p class="standing-progress"><strong>' +
+                html(rankLabel || "Top rank") +
+                "</strong> reached.</p>";
+
+        return [
+          '<article class="standing-card" aria-label="Your standing">',
+          '<div class="standing-card-top">',
+          '<p class="kicker">Your standing</p>',
+          rankLabel
+            ? '<p class="kicker">' + html(rankLabel) + "</p>"
+            : "",
+          "</div>",
+          '<div class="standing-card-grid">',
+          '<div class="standing-rank">',
+          html(pad2(rank)),
+          ofText
+            ? '<span class="of">' + html(ofText) + "</span>"
+            : "",
+          "</div>",
+          "<div>",
+          '<p class="standing-name">' + html(me.displayName || "—") + "</p>",
+          '<p class="standing-meta">' + html(fullMeta) + "</p>",
+          "</div>",
+          "<div>",
+          '<p class="standing-points">' +
+            html(formatPoints(me.totalPoints)) +
+            "</p>",
+          '<p class="standing-points-label">points</p>',
+          "</div>",
+          "</div>",
+          progressLine,
+          "</article>"
+        ].join("");
+      }
+
+      function renderStandingsList(snapshot) {
+        const entries = (snapshot && snapshot.entries) || [];
+        if (!entries.length) {
+          return (
+            '<p class="standings-loading">No rounds finished yet — be the first.</p>'
+          );
+        }
+        return [
+          '<ol class="standings-list">',
+          entries
+            .map((entry) => {
+              const classes = ["standings-row"];
+              if (entry.rank && entry.rank <= 3) classes.push("is-top");
+              if (entry.isCurrentPlayer) classes.push("is-current");
+              return [
+                '<li class="' + classes.join(" ") + '">',
+                '<span class="standings-rank">' +
+                  html(pad2(entry.rank || 0)) +
+                  "</span>",
+                '<div class="standings-person">',
+                '<p class="standings-name">',
+                html(entry.displayName || "—"),
+                entry.isCurrentPlayer
+                  ? '<span class="you-pill">You</span>'
+                  : "",
+                "</p>",
+                '<p class="standings-meta">' + renderStandingMeta(entry) + "</p>",
+                "</div>",
+                '<div class="standings-points-cell">',
+                '<span class="standings-points">' +
+                  html(formatPoints(entry.totalPoints)) +
+                  "</span>",
+                '<span class="standings-points-suffix">pts</span>',
+                "</div>",
+                "</li>"
+              ].join("");
+            })
+            .join(""),
+          "</ol>"
+        ].join("");
+      }
+
+      function renderLeaderboard(game) {
+        const score = (game && game.score) || {};
+        const snapshot = state.leaderboard;
+        const updatedLine = snapshot
+          ? formatRelativeUpdated(snapshot.updatedAt)
+          : "";
+        const limitLabel =
+          snapshot && snapshot.entries && snapshot.entries.length
+            ? "Top " + snapshot.entries.length + " · all time"
+            : "Top investigators";
+
+        let body;
+        if (state.leaderboardLoading && !snapshot) {
+          body =
+            '<p class="standings-loading">Tallying the standings…</p>';
+        } else if (state.leaderboardError) {
+          body =
+            '<div class="error" role="alert">' +
+            html(state.leaderboardError) +
+            "</div>";
+        } else {
+          body = [
+            renderStandingCard(snapshot, score),
+            '<section class="standings" aria-label="Top investigators">',
+            '<header class="standings-header">',
+            '<p class="kicker">' + html(limitLabel) + "</p>",
+            updatedLine
+              ? '<p class="utility-meta">' + html(updatedLine) + "</p>"
+              : "",
+            "</header>",
+            renderStandingsList(snapshot),
+            '<div class="standings-foot">',
+            '<span class="meta">Refreshes after every solved case.</span>',
+            '<button type="button" class="btn-secondary" data-action="open-welcome">← Back to welcome</button>',
+            "</div>",
+            "</section>"
+          ].join("");
+        }
+
+        return [
+          '<div class="shell-utility">',
+          '<button type="button" class="utility-link" data-action="open-welcome" aria-label="Back to welcome">',
+          '<span class="glyph" aria-hidden="true">←</span>',
+          'Welcome',
+          "</button>",
+          '<span class="utility-meta">Sus · the standings</span>',
+          "</div>",
+          '<div class="leaderboard">',
+          '<div class="leaderboard-hero">',
+          '<p class="kicker kicker-accent">The standings</p>',
+          "<h1>Who reads<br /><em>the closest?</em></h1>",
+          '<p class="lede">The press box ranks every investigator by points earned across cases. Wins, then best streaks, break ties — careful reading compounds.</p>',
+          "</div>",
+          body,
           "</div>"
         ].join("");
       }
@@ -1961,19 +2828,23 @@ export const SUS_WIDGET_HTML = `<!doctype html>
                 card.status === "remaining" &&
                 !isComplete;
               const isFlipped =
-                state.flippingCardId === card.id || card.status !== "remaining";
-              const isChecking = state.flippingCardId === card.id;
+                (state.busy === "Checking" && state.flippingCardId === card.id) ||
+                card.status !== "remaining";
+              const isChecking =
+                state.busy === "Checking" && state.flippingCardId === card.id;
 
               const classes = ["card", card.status];
               if (selectable) classes.push("selectable");
               if (isFlipped) classes.push("flipped");
 
               return [
-                '<article class="' + classes.join(" ") + '"',
+                '<article class="' +
+                  classes.join(" ") +
+                  '" data-card-id="' +
+                  html(card.id) +
+                  '"',
                 selectable
-                  ? ' role="button" tabindex="0" data-action="guess" data-card-id="' +
-                    html(card.id) +
-                    '"'
+                  ? ' role="button" tabindex="0" data-action="guess"'
                   : "",
                 ' aria-label="Card ' +
                   html(card.id) +
@@ -2068,21 +2939,28 @@ export const SUS_WIDGET_HTML = `<!doctype html>
           ].join("");
         }
 
-        const title =
-          card.status === "lie"
-            ? "Sus source"
-            : verdict === "truth" || card.status === "cleared"
-              ? "Careful claim"
-              : "Pending verdict";
-        const body =
-          card.explanation ||
-          "The verdict will appear after the card is checked.";
-        const tag =
-          verdict === "lie"
-            ? "Lie"
-            : verdict === "truth"
-              ? "Truth"
-              : "Pending";
+        const isLie = card.status === "lie" || verdict === "lie";
+        const isTruth =
+          card.status === "cleared" || verdict === "truth";
+        const isPending = !isLie && !isTruth;
+
+        const title = isLie
+          ? "Sus source"
+          : isTruth
+            ? "Careful claim"
+            : "Read the claim again.";
+        const lede = isPending
+          ? "Run the four-question lens before you accuse."
+          : card.explanation || "";
+        const tag = isLie
+          ? "Lie · accused"
+          : isTruth
+            ? "Truth · cleared"
+            : "Pending";
+
+        const verdictBody = isPending
+          ? renderPendingBody(card)
+          : renderVerdictBody(card, isLie);
 
         return [
           '<div class="card-face card-back">',
@@ -2092,7 +2970,8 @@ export const SUS_WIDGET_HTML = `<!doctype html>
           "</div>",
           '<div class="card-back-body">',
           '<h2 class="card-back-title">' + html(title) + "</h2>",
-          '<p class="card-back-text">' + html(body) + "</p>",
+          lede ? '<p class="card-back-text">' + html(lede) + "</p>" : "",
+          verdictBody,
           "</div>",
           '<div class="card-bottom">',
           '<span class="card-cta">' +
@@ -2101,6 +2980,43 @@ export const SUS_WIDGET_HTML = `<!doctype html>
           renderSourceLink(card),
           "</div>",
           "</div>"
+        ].join("");
+      }
+
+      function renderPendingBody(card) {
+        const claim = typeof card.claim === "string" ? card.claim.trim() : "";
+        return [
+          claim
+            ? '<p class="pending-claim">' + html(claim) + "</p>"
+            : "",
+          '<div class="lens-rule"><span>The lens</span></div>',
+          '<ul class="lens-prompts">',
+          '<li><span>Does it name a <em>caveat</em>, or speak in absolutes?</span></li>',
+          '<li><span>Is the <em>scope</em> a study, a region, or a universal law?</span></li>',
+          '<li><span>Does it offer a <em>mechanism</em>, or only an image?</span></li>',
+          '<li><span>Is the <em>certainty</em> earned, or borrowed?</span></li>',
+          "</ul>"
+        ].join("");
+      }
+
+      function renderVerdictBody(card, isLie) {
+        const claim = typeof card.claim === "string" ? card.claim.trim() : "";
+        const tell =
+          typeof card.credibilitySignal === "string"
+            ? card.credibilitySignal.trim()
+            : "";
+        const spinTag = isLie ? "Subtle spin" : "Holds up";
+
+        return [
+          claim
+            ? '<p class="verdict-quote">' + html(claim) + "</p>"
+            : "",
+          tell
+            ? '<p class="verdict-tell"><span class="num">1</span><span>' +
+              html(tell) +
+              "</span></p>"
+            : "",
+          '<span class="spin-tag">' + html(spinTag) + "</span>"
         ].join("");
       }
 
@@ -2309,6 +3225,19 @@ export const SUS_WIDGET_HTML = `<!doctype html>
               scrollCards(1);
             }
           });
+          cardCarousel.addEventListener(
+            "scroll",
+            () => {
+              if (carouselPersistTimer) {
+                window.clearTimeout(carouselPersistTimer);
+              }
+              carouselPersistTimer = window.setTimeout(() => {
+                rememberCarouselPosition();
+                carouselPersistTimer = 0;
+              }, 120);
+            },
+            { passive: true }
+          );
         }
 
         root.querySelectorAll("[data-action]").forEach((element) => {
@@ -2347,10 +3276,12 @@ export const SUS_WIDGET_HTML = `<!doctype html>
               return;
             }
             if (action === "guess") {
-              state.flippingCardId = element.getAttribute("data-card-id") || "";
+              const cardId = element.getAttribute("data-card-id") || "";
+              state.flippingCardId = cardId;
+              rememberCarouselPosition(cardId);
               await runTool(
                 "guess_sus_source",
-                { cardId: element.getAttribute("data-card-id") },
+                { cardId },
                 "Checking"
               );
             }
@@ -2361,6 +3292,19 @@ export const SUS_WIDGET_HTML = `<!doctype html>
               }
               await runTool("reset_game", { clearScore: true }, "Closing");
             }
+            if (action === "open-leaderboard") {
+              event.preventDefault();
+              state.view = "leaderboard";
+              state.leaderboardError = "";
+              render();
+              await loadLeaderboard();
+            }
+            if (action === "open-welcome") {
+              event.preventDefault();
+              state.view = "";
+              state.leaderboardError = "";
+              render();
+            }
           });
         });
 
@@ -2368,10 +3312,12 @@ export const SUS_WIDGET_HTML = `<!doctype html>
           card.addEventListener("keydown", async (event) => {
             if (event.key !== "Enter" && event.key !== " ") return;
             event.preventDefault();
-            state.flippingCardId = card.getAttribute("data-card-id") || "";
+            const cardId = card.getAttribute("data-card-id") || "";
+            state.flippingCardId = cardId;
+            rememberCarouselPosition(cardId);
             await runTool(
               "guess_sus_source",
-              { cardId: card.getAttribute("data-card-id") },
+              { cardId },
               "Checking"
             );
           });
