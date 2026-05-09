@@ -1,4 +1,4 @@
-const DEFAULT_AUTH_SCOPE = "sus.play";
+const DEFAULT_AUTH_SCOPES = ["openid", "profile", "email"];
 const DEFAULT_LOCAL_PLAYER_ID = "local-player";
 const JWKS_CACHE_TTL_MS = 5 * 60 * 1000;
 const CLOCK_SKEW_SECONDS = 60;
@@ -22,7 +22,9 @@ type AuthConfig = {
   issuer: string;
   audience: string;
   jwksUrl: string;
-  scope: string;
+  userinfoUrl: string;
+  scopes: string[];
+  scopeText: string;
   resource: string;
   enabled: boolean;
   required: boolean;
@@ -79,17 +81,21 @@ export function getAuthConfig(env: Env, request?: Request): AuthConfig {
   const issuer = env.SUS_AUTH_ISSUER?.trim() ?? "";
   const audience = env.SUS_AUTH_AUDIENCE?.trim() ?? "";
   const jwksUrl = env.SUS_AUTH_JWKS_URL?.trim() ?? "";
-  const scope = env.SUS_AUTH_SCOPE?.trim() || DEFAULT_AUTH_SCOPE;
+  const userinfoUrl = env.SUS_AUTH_USERINFO_URL?.trim() ?? "";
+  const scopes = parseScopes(env.SUS_AUTH_SCOPE);
+  const scopeText = scopes.join(" ");
   const origin = request ? new URL(request.url).origin : "";
   const resource = env.SUS_AUTH_RESOURCE?.trim() || origin || audience;
   const required = env.SUS_AUTH_REQUIRED?.trim().toLowerCase() === "true";
-  const enabled = Boolean(issuer && audience && jwksUrl);
+  const enabled = Boolean(issuer && jwksUrl);
 
   return {
     issuer,
     audience,
     jwksUrl,
-    scope,
+    userinfoUrl,
+    scopes,
+    scopeText,
     resource,
     enabled,
     required,
@@ -104,7 +110,7 @@ export function getToolSecuritySchemes(env: Env) {
     return [{ type: "noauth" as const }];
   }
 
-  const oauth = { type: "oauth2" as const, scopes: [config.scope] };
+  const oauth = { type: "oauth2" as const, scopes: config.scopes };
   return config.required ? [oauth] : [{ type: "noauth" as const }, oauth];
 }
 
@@ -125,7 +131,7 @@ export function createProtectedResourceMetadataResponse(
       {
         resource: config.resource,
         authorization_servers: [config.issuer],
-        scopes_supported: [config.scope],
+        scopes_supported: config.scopes,
         resource_documentation: new URL("/", request.url).href
       },
       null,
@@ -184,14 +190,14 @@ export async function resolvePlayerIdentity(
 
   if (config.misconfigured) {
     throw new AuthConfigurationError(
-      "SUS_AUTH_REQUIRED is true, but SUS_AUTH_ISSUER, SUS_AUTH_AUDIENCE, or SUS_AUTH_JWKS_URL is missing."
+      "SUS_AUTH_REQUIRED is true, but SUS_AUTH_ISSUER or SUS_AUTH_JWKS_URL is missing."
     );
   }
 
   const token = extractBearerToken(request);
   if (token && config.enabled) {
-    const payload = await verifyJwt(token, config);
-    const subject = payload.sub;
+    const tokenClaims = await resolveTokenClaims(token, config);
+    const subject = tokenClaims.sub;
     if (!subject) {
       throw new AuthChallengeError("OAuth token is missing the subject claim.");
     }
@@ -199,7 +205,7 @@ export async function resolvePlayerIdentity(
     const id = await hashedPlayerId(config.issuer, subject);
     return {
       id,
-      displayName: resolveDisplayName(payload, id),
+      displayName: resolveDisplayName(tokenClaims, id),
       source: "oauth",
       subject
     };
@@ -254,7 +260,7 @@ function buildWwwAuthenticateHeader(
   const config = getAuthConfig(env, request);
   return [
     `Bearer resource_metadata="${metadataUrl.href}"`,
-    `scope="${escapeAuthParam(config.scope)}"`,
+    `scope="${escapeAuthParam(config.scopeText)}"`,
     `error="${escapeAuthParam(error.code)}"`,
     `error_description="${escapeAuthParam(error.message)}"`
   ].join(", ");
@@ -264,6 +270,10 @@ function extractBearerToken(request: Request) {
   const authorization = request.headers.get("authorization");
   const match = authorization?.match(/^Bearer\s+(.+)$/i);
   return match?.[1]?.trim() ?? null;
+}
+
+function isCompactJwt(token: string) {
+  return token.split(".").length === 3;
 }
 
 async function verifyJwt(token: string, config: AuthConfig) {
@@ -305,6 +315,25 @@ async function verifyJwt(token: string, config: AuthConfig) {
 
   validateJwtClaims(payload, config);
   return payload;
+}
+
+async function resolveTokenClaims(token: string, config: AuthConfig) {
+  if (isCompactJwt(token)) {
+    const payload = await verifyJwt(token, config);
+    const userinfo = await fetchUserInfo(token, config);
+    return {
+      ...payload,
+      ...userinfo,
+      sub: payload.sub ?? userinfo?.sub
+    };
+  }
+
+  const userinfo = await fetchUserInfo(token, config);
+  if (!userinfo?.sub) {
+    throw new AuthChallengeError("OAuth access token could not be verified.");
+  }
+
+  return userinfo;
 }
 
 async function getJwkForHeader(jwksUrl: string, header: JwtHeader) {
@@ -353,7 +382,7 @@ function validateJwtClaims(payload: JwtPayload, config: AuthConfig) {
     throw new AuthChallengeError("OAuth token issuer is not trusted.");
   }
 
-  if (!audienceMatches(payload.aud, config.audience)) {
+  if (config.audience && !audienceMatches(payload.aud, config.audience)) {
     throw new AuthChallengeError("OAuth token audience does not match Sus.");
   }
 
@@ -365,8 +394,8 @@ function validateJwtClaims(payload: JwtPayload, config: AuthConfig) {
     throw new AuthChallengeError("OAuth token is not valid yet.");
   }
 
-  if (!scopeMatches(payload, config.scope)) {
-    throw new AuthChallengeError("OAuth token is missing the Sus play scope.");
+  if (!scopeMatches(payload, config.scopes)) {
+    throw new AuthChallengeError("OAuth token is missing required Sus scopes.");
   }
 }
 
@@ -375,7 +404,7 @@ function audienceMatches(audience: JwtPayload["aud"], expected: string) {
   return audience === expected;
 }
 
-function scopeMatches(payload: JwtPayload, requiredScope: string) {
+function scopeMatches(payload: JwtPayload, requiredScopes: string[]) {
   const scopes = new Set<string>();
 
   if (typeof payload.scope === "string") {
@@ -388,7 +417,21 @@ function scopeMatches(payload: JwtPayload, requiredScope: string) {
     for (const scope of payload.scp.split(/\s+/)) scopes.add(scope);
   }
 
-  return scopes.has(requiredScope);
+  return requiredScopes.every((scope) => scopes.has(scope));
+}
+
+async function fetchUserInfo(token: string, config: AuthConfig) {
+  if (!config.userinfoUrl) return null;
+
+  const response = await fetch(config.userinfoUrl, {
+    headers: {
+      accept: "application/json",
+      authorization: `Bearer ${token}`
+    }
+  });
+  if (!response.ok) return null;
+
+  return (await response.json()) as JwtPayload;
 }
 
 async function hashedPlayerId(issuer: string, subject: string) {
@@ -480,6 +523,11 @@ function cleanDisplayName(value: string | null | undefined) {
 
 function escapeAuthParam(value: string) {
   return value.replace(/\\/g, "\\\\").replace(/"/g, '\\"');
+}
+
+function parseScopes(value: string | null | undefined) {
+  const scopes = value?.trim().split(/\s+/).filter(Boolean) ?? [];
+  return scopes.length > 0 ? scopes : DEFAULT_AUTH_SCOPES;
 }
 
 function isPlayerSource(value: string | null): value is PlayerIdentitySource {

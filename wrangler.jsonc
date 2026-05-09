@@ -29,7 +29,8 @@
     {
       "binding": "SUS_DB",
       "database_name": "sus",
-      "migrations_dir": "migrations"
+      "migrations_dir": "migrations",
+      "database_id": "668d4d62-1b24-448c-b03a-0f19860cd8ab"
     }
   ],
   "migrations": [
@@ -43,11 +44,12 @@
   },
   "vars": {
     "SUS_AUTH_AUDIENCE": "",
-    "SUS_AUTH_ISSUER": "",
-    "SUS_AUTH_JWKS_URL": "",
-    "SUS_AUTH_REQUIRED": "false",
-    "SUS_AUTH_RESOURCE": "",
-    "SUS_AUTH_SCOPE": "sus.play"
+    "SUS_AUTH_ISSUER": "https://ultimate-beagle-31.clerk.accounts.dev",
+    "SUS_AUTH_JWKS_URL": "https://ultimate-beagle-31.clerk.accounts.dev/.well-known/jwks.json",
+    "SUS_AUTH_REQUIRED": "true",
+    "SUS_AUTH_RESOURCE": "https://sus.wt-lau.workers.dev",
+    "SUS_AUTH_SCOPE": "openid profile email",
+    "SUS_AUTH_USERINFO_URL": "https://ultimate-beagle-31.clerk.accounts.dev/oauth/userinfo"
   },
   "secrets": {
     "required": ["EXA_API_KEY"]

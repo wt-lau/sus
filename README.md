@@ -186,21 +186,30 @@ Sus uses two storage layers:
   players.
 
 For local development, Sus falls back to `?user=...`, `x-sus-user-id`, or the
-MCP session ID. For the ChatGPT app, configure OAuth so ChatGPT sends
-`Authorization: Bearer <token>` to `/mcp`; the Worker verifies the token with
-JWKS and derives a stable hashed player ID from `iss + sub`.
+MCP session ID when OAuth is disabled. For the ChatGPT app, Clerk is configured
+as the OAuth provider so ChatGPT sends `Authorization: Bearer <token>` to
+`/mcp`; the Worker verifies the token with Clerk's JWKS, reads profile data from
+Clerk userinfo when available, and derives a stable hashed player ID from
+`iss + sub`.
 
 Configure these environment variables in `wrangler.jsonc` or the Cloudflare
 dashboard:
 
 ```text
-SUS_AUTH_ISSUER=https://your-auth-server.example.com
-SUS_AUTH_AUDIENCE=https://your-sus-worker.example.com
-SUS_AUTH_JWKS_URL=https://your-auth-server.example.com/.well-known/jwks.json
-SUS_AUTH_RESOURCE=https://your-sus-worker.example.com
-SUS_AUTH_SCOPE=sus.play
+SUS_AUTH_ISSUER=https://ultimate-beagle-31.clerk.accounts.dev
+SUS_AUTH_AUDIENCE=
+SUS_AUTH_JWKS_URL=https://ultimate-beagle-31.clerk.accounts.dev/.well-known/jwks.json
+SUS_AUTH_RESOURCE=https://sus.wt-lau.workers.dev
+SUS_AUTH_SCOPE=openid profile email
 SUS_AUTH_REQUIRED=true
+SUS_AUTH_USERINFO_URL=https://ultimate-beagle-31.clerk.accounts.dev/oauth/userinfo
 ```
+
+Leave `SUS_AUTH_AUDIENCE` blank for Clerk dynamic-client registration. If you
+switch to a fixed Clerk OAuth client and know the expected token audience, set
+it and Sus will enforce it.
+Sus accepts Clerk JWT access tokens through JWKS verification and Clerk opaque
+OAuth access tokens through the userinfo endpoint.
 
 The Worker exposes OAuth protected resource metadata at:
 
