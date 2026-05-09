@@ -1,4 +1,4 @@
-export const SUS_WIDGET_URI = "ui://widget/sus-source-cards-v9.html";
+export const SUS_WIDGET_URI = "ui://widget/sus-source-cards-v13.html";
 export const SUS_WIDGET_MIME_TYPE = "text/html;profile=mcp-app";
 
 export const SUS_WIDGET_HTML = `<!doctype html>
@@ -1883,8 +1883,14 @@ export const SUS_WIDGET_HTML = `<!doctype html>
           window.openai.widgetState &&
           (window.openai.widgetState.privateContent || window.openai.widgetState)) ||
         {};
+      const initialToolOutput =
+        getStructuredContent(
+          window.openai && window.openai.toolOutput
+            ? window.openai.toolOutput
+            : null
+        );
       const state = {
-        game: window.openai && window.openai.toolOutput ? window.openai.toolOutput : null,
+        game: initialToolOutput,
         topic: savedUiState.topic || "",
         carouselCardId: savedUiState.carouselCardId || "",
         carouselScrollLeft:
@@ -1896,21 +1902,83 @@ export const SUS_WIDGET_HTML = `<!doctype html>
         error: "",
         // "" follows the game state; "leaderboard" overrides welcome
         // with the standings view. Only valid when no round is active.
-        view: "",
-        leaderboard: null,
-        leaderboardError: "",
+        view: isLeaderboardOutput(initialToolOutput) ? "leaderboard" : "",
+        leaderboard: getLeaderboardSnapshot(initialToolOutput),
+        leaderboardError: getLeaderboardError(initialToolOutput),
         leaderboardLoading: false
       };
       let gameSignature = serializeGame(state.game);
       let carouselPersistTimer = 0;
 
       function getStructuredContent(result) {
-        if (!result) return null;
-        if (result.structuredContent) return result.structuredContent;
-        if (result.result && result.result.structuredContent) {
-          return result.result.structuredContent;
+        return unwrapStructuredContent(result, 0);
+      }
+
+      function unwrapStructuredContent(result, depth) {
+        if (!result || depth > 6) return null;
+        if (isGameToolOutput(result)) return result;
+        if (!isRecord(result)) return null;
+
+        if (result.structuredContent) {
+          const structured = unwrapStructuredContent(
+            result.structuredContent,
+            depth + 1
+          );
+          if (structured) return structured;
         }
-        return result;
+
+        for (const key of ["result", "toolResult", "data", "output", "value"]) {
+          if (!result[key]) continue;
+          const nested = unwrapStructuredContent(result[key], depth + 1);
+          if (nested) return nested;
+        }
+
+        return parseToolContent(result.content, depth + 1);
+      }
+
+      function parseToolContent(content, depth) {
+        if (!Array.isArray(content)) return null;
+
+        for (const item of content) {
+          const text = item && typeof item.text === "string" ? item.text : "";
+          if (!text) continue;
+
+          const parsed = parseJsonText(text);
+          if (!parsed) continue;
+
+          const structured = unwrapStructuredContent(parsed, depth + 1);
+          if (structured) return structured;
+        }
+
+        return null;
+      }
+
+      function parseJsonText(text) {
+        const trimmed = text.trim();
+        if (!trimmed || !/^[{[]/.test(trimmed)) return null;
+
+        try {
+          return JSON.parse(trimmed);
+        } catch (_) {
+          return null;
+        }
+      }
+
+      function isRecord(value) {
+        return Boolean(value) && typeof value === "object" && !Array.isArray(value);
+      }
+
+      function isGameToolOutput(value) {
+        if (!isRecord(value)) return false;
+        if (isLeaderboardOutput(value)) return true;
+        if (value.round || value.reveal || value.score || value.session) return true;
+        if (Array.isArray(value.suggestedTopics) || Array.isArray(value.nextActions)) {
+          return true;
+        }
+        return (
+          typeof value.status === "string" &&
+          Boolean(value.message || value.player || value.answer || value.sourceSearch)
+        );
       }
 
       function html(value) {
@@ -1938,6 +2006,73 @@ export const SUS_WIDGET_HTML = `<!doctype html>
         state.game = nextGame;
         gameSignature = nextSignature;
         return true;
+      }
+
+      function isLeaderboardOutput(output) {
+        return (
+          output &&
+          (output.view === "leaderboard" ||
+            output.status === "leaderboard-ready" ||
+            output.status === "leaderboard-unavailable")
+        );
+      }
+
+      function getLeaderboardSnapshot(output) {
+        return isLeaderboardOutput(output) && output.leaderboard
+          ? output.leaderboard
+          : null;
+      }
+
+      function getLeaderboardError(output) {
+        if (!isLeaderboardOutput(output)) return "";
+        if (output.status !== "leaderboard-unavailable") return "";
+        return (
+          output.message ||
+          "Leaderboard is not available yet. Finish a round to create an entry."
+        );
+      }
+
+      function applyToolOutput(nextOutput, source) {
+        const output = getStructuredContent(nextOutput);
+        if (!output) return false;
+        if (isStaleGlobalOutput(output, source)) return false;
+
+        const gameChanged = setGame(output);
+        if (!isLeaderboardOutput(output)) {
+          return gameChanged;
+        }
+
+        let leaderboardChanged = false;
+        if (state.view !== "leaderboard") {
+          state.view = "leaderboard";
+          leaderboardChanged = true;
+        }
+
+        const nextLeaderboard = getLeaderboardSnapshot(output);
+        if (nextLeaderboard && state.leaderboard !== nextLeaderboard) {
+          state.leaderboard = nextLeaderboard;
+          leaderboardChanged = true;
+        }
+
+        const nextError = getLeaderboardError(output);
+        if (state.leaderboardError !== nextError) {
+          state.leaderboardError = nextError;
+          leaderboardChanged = true;
+        }
+
+        if (state.leaderboardLoading) {
+          state.leaderboardLoading = false;
+          leaderboardChanged = true;
+        }
+
+        return gameChanged || leaderboardChanged;
+      }
+
+      function isStaleGlobalOutput(output, source) {
+        if (source !== "global") return false;
+        if (!state.game || (!state.game.round && !state.game.reveal)) return false;
+        if (output.round || output.reveal) return false;
+        return output.status === "welcome" || output.status === "idle";
       }
 
       function callBridge(method, params) {
@@ -1988,13 +2123,12 @@ export const SUS_WIDGET_HTML = `<!doctype html>
         try {
           const nextGame = await callTool(name, args || {});
           if (nextGame) {
-            setGame(nextGame);
-            if (
-              name === "start_game" ||
-              name === "start_round" ||
-              name === "reset_game"
-            ) {
-              resetCarouselState();
+            applyToolOutput(nextGame, "tool");
+            if (name === "start_game" || name === "reset_game") {
+              resetCarouselState(true);
+            }
+            if (name === "start_round") {
+              resetCarouselState(false);
             }
           }
         } catch (error) {
@@ -2040,6 +2174,9 @@ export const SUS_WIDGET_HTML = `<!doctype html>
       }
 
       function persistUiState() {
+        if (state.busy) {
+          return;
+        }
         if (!window.openai || typeof window.openai.setWidgetState !== "function") {
           return;
         }
@@ -2052,11 +2189,13 @@ export const SUS_WIDGET_HTML = `<!doctype html>
         });
       }
 
-      function resetCarouselState() {
+      function resetCarouselState(shouldPersist) {
         state.carouselCardId = "";
         state.carouselScrollLeft = 0;
         state.flippingCardId = "";
-        persistUiState();
+        if (shouldPersist !== false) {
+          persistUiState();
+        }
       }
 
       function resetCaseDraft() {
@@ -2118,7 +2257,7 @@ export const SUS_WIDGET_HTML = `<!doctype html>
         };
       }
 
-      function rememberCarouselPosition(cardId) {
+      function rememberCarouselPosition(cardId, shouldPersist) {
         const carousel = root.querySelector("[data-card-carousel]");
         if (carousel) {
           state.carouselScrollLeft = carousel.scrollLeft;
@@ -2127,7 +2266,9 @@ export const SUS_WIDGET_HTML = `<!doctype html>
         } else if (cardId) {
           state.carouselCardId = cardId;
         }
-        persistUiState();
+        if (shouldPersist !== false) {
+          persistUiState();
+        }
       }
 
       function restoreCarousel(snapshot) {
@@ -3164,7 +3305,6 @@ export const SUS_WIDGET_HTML = `<!doctype html>
             state.topic = event.target.value;
           });
           topicInput.addEventListener("change", persistUiState);
-          topicInput.addEventListener("blur", persistUiState);
         }
 
         const topicForm = root.querySelector("[data-topic-form]");
@@ -3241,7 +3381,7 @@ export const SUS_WIDGET_HTML = `<!doctype html>
             if (action === "guess") {
               const cardId = element.getAttribute("data-card-id") || "";
               state.flippingCardId = cardId;
-              rememberCarouselPosition(cardId);
+              rememberCarouselPosition(cardId, false);
               await runTool(
                 "guess_sus_source",
                 { cardId },
@@ -3277,7 +3417,7 @@ export const SUS_WIDGET_HTML = `<!doctype html>
             event.preventDefault();
             const cardId = card.getAttribute("data-card-id") || "";
             state.flippingCardId = cardId;
-            rememberCarouselPosition(cardId);
+            rememberCarouselPosition(cardId, false);
             await runTool(
               "guess_sus_source",
               { cardId },
@@ -3344,7 +3484,7 @@ export const SUS_WIDGET_HTML = `<!doctype html>
           // Skip re-render when the host echoes back an unchanged toolOutput.
           // Without this, host global updates can tear down the DOM while a
           // draft input is focused.
-          if (nextOutput && setGame(nextOutput)) {
+          if (applyToolOutput(nextOutput, "global")) {
             render();
           }
         },
@@ -3364,7 +3504,7 @@ export const SUS_WIDGET_HTML = `<!doctype html>
             return;
           }
           const nextOutput = getStructuredContent(message.params);
-          if (nextOutput && setGame(nextOutput)) {
+          if (applyToolOutput(nextOutput, "notification")) {
             render();
           }
         },

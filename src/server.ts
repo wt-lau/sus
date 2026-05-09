@@ -31,9 +31,7 @@ import {
   type CardId,
   type GeneratedImageAsset,
   type GameState,
-  type Round,
-  type SourceSeed,
-  type SourceSpin
+  type Round
 } from "./game";
 import {
   SUS_WIDGET_HTML,
@@ -64,8 +62,6 @@ const MCP_PATH = "/mcp";
 const MCP_TRANSPORT_STATE_KEY = "mcp-transport-state";
 const PLAYER_IDENTITY_STATE_KEY = "player-identity";
 const WORKERS_AI_IMAGE_MODEL = "@cf/black-forest-labs/flux-1-schnell";
-const WORKERS_AI_SPIN_MODEL = "openai/gpt-5.4-mini";
-const WORKERS_AI_GATEWAY_ID = "default";
 const susWidgetResourceMeta = {
   ui: {
     prefersBorder: true,
@@ -106,19 +102,6 @@ const sourcesInputSchema = z
   .describe(
     "Exactly five source cards gathered for the topic. Sus will keep four truthful and add a minor false spin to one."
   );
-const sourceSpinOutputSchema = z
-  .object({
-    spunClaim: z.string().trim().min(20).max(420),
-    spinDescription: z.string().trim().min(8).max(220),
-    headline: z.string().trim().min(1).max(180).optional(),
-    credibilitySignal: z.string().trim().min(20).max(280).optional(),
-    questionHints: z
-      .array(z.string().trim().min(8).max(160))
-      .min(1)
-      .max(2)
-      .optional()
-  })
-  .strict();
 
 function jsonResponse(value: Record<string, unknown>, text?: string) {
   return {
@@ -153,6 +136,15 @@ function dataToolMeta(invoking: string, invoked: string) {
     "openai/widgetAccessible": true,
     "openai/toolInvocation/invoking": invoking,
     "openai/toolInvocation/invoked": invoked
+  };
+}
+
+function appOnlyDataToolMeta(invoking: string, invoked: string) {
+  return {
+    ...dataToolMeta(invoking, invoked),
+    ui: {
+      visibility: ["app"]
+    }
   };
 }
 
@@ -234,19 +226,19 @@ async function isMcpInitializeRequest(request: Request) {
 
 type RoundPreparation =
   | {
-    round: ReturnType<typeof createRound>;
-    sourceSearch: {
-      mode: "starter-pack" | "provided-sources";
-    };
-  }
+      round: ReturnType<typeof createRound>;
+      sourceSearch: {
+        mode: "starter-pack" | "provided-sources";
+      };
+    }
   | {
-    round: ReturnType<typeof createRound>;
-    sourceSearch: {
-      mode: "exa";
-      requestId?: string;
-      query: string;
+      round: ReturnType<typeof createRound>;
+      sourceSearch: {
+        mode: "exa";
+        requestId?: string;
+        query: string;
+      };
     };
-  };
 
 async function prepareRound(
   topic: string | undefined,
@@ -254,14 +246,8 @@ async function prepareRound(
   env: Env
 ): Promise<RoundPreparation> {
   if (sources) {
-    const sourceSpin = await generateSourceSpinWithAi(
-      topic?.trim() || null,
-      sources,
-      env
-    );
-
     return {
-      round: createRound(topic, sources, undefined, sourceSpin),
+      round: createRound(topic, sources),
       sourceSearch: { mode: "provided-sources" }
     };
   }
@@ -282,14 +268,9 @@ async function prepareRound(
   }
 
   const sourceSearch = await searchTopicSourcesWithExa(requestedTopic, apiKey);
-  const sourceSpin = await generateSourceSpinWithAi(
-    requestedTopic,
-    sourceSearch.sources,
-    env
-  );
 
   return {
-    round: createRound(requestedTopic, sourceSearch.sources, "exa", sourceSpin),
+    round: createRound(requestedTopic, sourceSearch.sources, "exa"),
     sourceSearch: exaSearchMeta(sourceSearch)
   };
 }
@@ -300,151 +281,6 @@ function exaSearchMeta(sourceSearch: ExaSourceSearch) {
     requestId: sourceSearch.requestId,
     query: sourceSearch.query
   };
-}
-
-type WorkersAiChatResponse = {
-  choices?: Array<{
-    message?: {
-      content?: string | null;
-    };
-  }>;
-  result?: WorkersAiChatResponse;
-  response?: string;
-};
-
-async function generateSourceSpinWithAi(
-  topic: string | null,
-  sources: SourceSeed[],
-  env: Env
-): Promise<SourceSpin | undefined> {
-  if (sources.length !== 5) return undefined;
-
-  const sourceIndex = Math.floor(Math.random() * sources.length);
-  const source = sources[sourceIndex];
-  if (!source) return undefined;
-
-  try {
-    const response = (await env.AI.run(
-      WORKERS_AI_SPIN_MODEL,
-      {
-        messages: buildSpinMessages(topic, source, sources),
-        response_format: { type: "json_object" },
-        max_completion_tokens: 420,
-        temperature: 1
-      },
-      {
-        gateway: { id: WORKERS_AI_GATEWAY_ID }
-      }
-    )) as WorkersAiChatResponse;
-    const content = extractAiMessageContent(response);
-    if (!content) return undefined;
-
-    const parsed = sourceSpinOutputSchema.safeParse(
-      parseJsonFromModelContent(content)
-    );
-    if (!parsed.success) return undefined;
-
-    const sourceSpin: SourceSpin = {
-      sourceIndex,
-      claim: parsed.data.spunClaim,
-      description: parsed.data.spinDescription,
-      headline: parsed.data.headline,
-      credibilitySignal: parsed.data.credibilitySignal,
-      questionHints: parsed.data.questionHints
-    };
-
-    return isUsefulGeneratedSpin(source.claim, sourceSpin.claim)
-      ? sourceSpin
-      : undefined;
-  } catch (error) {
-    console.warn(
-      "Workers AI spin generation failed; falling back to local spin.",
-      error instanceof Error ? error.message : String(error)
-    );
-    return undefined;
-  }
-}
-
-function buildSpinMessages(
-  topic: string | null,
-  source: SourceSeed,
-  sources: SourceSeed[]
-) {
-  return [
-    {
-      role: "system" as const,
-      content: [
-        "You write one subtle false spin for Sus, a source-checking game.",
-        "Keep the card plausible and close to the original source.",
-        "Do not invent new names, dates, places, studies, figures, or mechanisms.",
-        "The spin should make a bounded source claim false by changing scope, certainty, causality, or caveats.",
-        "Return only a JSON object with spunClaim, spinDescription, headline, credibilitySignal, and questionHints."
-      ].join(" ")
-    },
-    {
-      role: "user" as const,
-      content: JSON.stringify({
-        topic: topic ?? "Custom source pack",
-        chosenSource: source,
-        otherClaims: sources
-          .filter((candidate) => candidate !== source)
-          .map((candidate) => ({
-            sourceName: candidate.sourceName,
-            claim: candidate.claim
-          })),
-        requirements: {
-          spunClaim:
-            "A revised version of chosenSource.claim that is subtly false but still source-shaped.",
-          spinDescription:
-            "Short explanation of the exact wording move, for example changed a caveated association into a causal guarantee.",
-          headline:
-            "Optional revised headline aligned with the spun claim. Omit if the original headline still fits.",
-          credibilitySignal:
-            "One sentence explaining why this looks credible but overreaches.",
-          questionHints:
-            "One or two short clue hints that do not directly name the lie."
-        }
-      })
-    }
-  ];
-}
-
-function extractAiMessageContent(response: WorkersAiChatResponse) {
-  return (
-    response.choices?.[0]?.message?.content ??
-    response.result?.choices?.[0]?.message?.content ??
-    response.result?.response ??
-    response.response ??
-    null
-  );
-}
-
-function parseJsonFromModelContent(content: string) {
-  const normalized = content
-    .trim()
-    .replace(/^```(?:json)?\s*/i, "")
-    .replace(/\s*```$/i, "")
-    .trim();
-
-  try {
-    return JSON.parse(normalized) as unknown;
-  } catch {
-    const start = normalized.indexOf("{");
-    const end = normalized.lastIndexOf("}");
-    if (start === -1 || end <= start) throw new Error("No JSON object found.");
-    return JSON.parse(normalized.slice(start, end + 1)) as unknown;
-  }
-}
-
-function isUsefulGeneratedSpin(originalClaim: string, spunClaim: string) {
-  const normalize = (value: string) =>
-    value
-      .toLowerCase()
-      .replace(/\s+/g, " ")
-      .replace(/[.!?]+$/, "")
-      .trim();
-
-  return normalize(originalClaim) !== normalize(spunClaim);
 }
 
 function exaErrorResponse(error: unknown, topic?: string) {
@@ -637,6 +473,13 @@ export class SusGameMcp extends Agent<Env, GameState> {
     return withToolSecuritySchemes(this.env, dataToolMeta(invoking, invoked));
   }
 
+  private appOnlyDataToolMeta(invoking: string, invoked: string) {
+    return withToolSecuritySchemes(
+      this.env,
+      appOnlyDataToolMeta(invoking, invoked)
+    );
+  }
+
   private widgetToolMeta(invoking: string, invoked: string) {
     return withToolSecuritySchemes(this.env, widgetToolMeta(invoking, invoked));
   }
@@ -685,6 +528,45 @@ export class SusGameMcp extends Agent<Env, GameState> {
             ? error.message
             : "Leaderboard score could not be persisted."
       } satisfies PersistedRoundScore;
+    }
+  }
+
+  private async leaderboardResponse(limit?: number) {
+    const player = await this.getPlayerIdentity();
+
+    try {
+      const leaderboard = await getLeaderboard(
+        this.env.SUS_DB,
+        player.id,
+        limit
+      );
+
+      return jsonResponse({
+        status: "leaderboard-ready",
+        view: "leaderboard",
+        message: "Leaderboard widget is ready.",
+        player,
+        score: normalizeScore(this.state.score),
+        suggestedTopics: listTopics(),
+        leaderboard,
+        nextActions: ["Start another round to climb the leaderboard."]
+      });
+    } catch (error) {
+      return jsonResponse({
+        status: "leaderboard-unavailable",
+        view: "leaderboard",
+        message:
+          error instanceof Error
+            ? error.message
+            : "Leaderboard is unavailable.",
+        player,
+        score: normalizeScore(this.state.score),
+        suggestedTopics: listTopics(),
+        nextActions: [
+          "Apply the D1 migrations.",
+          "Then finish a round to create a leaderboard entry."
+        ]
+      });
     }
   }
 
@@ -1197,11 +1079,11 @@ export class SusGameMcp extends Agent<Env, GameState> {
         );
         const score = solvedByElimination
           ? finishScoredRound(
-            scoreAfterWrongGuess,
-            round,
-            "elimination-win",
-            guess.guessedAt
-          )
+              scoreAfterWrongGuess,
+              round,
+              "elimination-win",
+              guess.guessedAt
+            )
           : scoreAfterWrongGuess;
         const nextState: GameState = {
           ...this.state,
@@ -1352,9 +1234,9 @@ export class SusGameMcp extends Agent<Env, GameState> {
           nextState.status === "revealed"
             ? await this.persistScore(nextState.score)
             : {
-              persisted: false,
-              reason: "Round was already solved before reveal."
-            };
+                persisted: false,
+                reason: "Round was already solved before reveal."
+              };
 
         return jsonResponse({
           status: nextState.status,
@@ -1376,11 +1258,38 @@ export class SusGameMcp extends Agent<Env, GameState> {
     );
 
     this.server.registerTool(
+      "render_leaderboard",
+      {
+        title: "Render Sus leaderboard",
+        description:
+          "Use this when the user asks to show, open, see, display, or get the Sus leaderboard widget. Reads D1 standings and renders the leaderboard UI.",
+        inputSchema: {
+          limit: z
+            .number()
+            .int()
+            .min(1)
+            .max(50)
+            .optional()
+            .describe("Maximum number of top players to show.")
+        },
+        outputSchema: gameViewOutputSchema,
+        annotations: {
+          readOnlyHint: true,
+          destructiveHint: false,
+          idempotentHint: true,
+          openWorldHint: false
+        },
+        _meta: this.widgetToolMeta("Opening leaderboard", "Leaderboard ready")
+      },
+      async ({ limit }) => this.leaderboardResponse(limit)
+    );
+
+    this.server.registerTool(
       "get_leaderboard",
       {
-        title: "Get Sus leaderboard",
+        title: "Get Sus leaderboard data",
         description:
-          "Use this when the user asks for Sus standings, personal rank, or the current leaderboard.",
+          "Use this when ChatGPT needs raw Sus standings data without rendering a widget. If the user asks to show, open, see, display, or get the leaderboard, use render_leaderboard instead.",
         inputSchema: {
           limit: z
             .number()
@@ -1397,39 +1306,12 @@ export class SusGameMcp extends Agent<Env, GameState> {
           idempotentHint: true,
           openWorldHint: false
         },
-        _meta: this.dataToolMeta("Loading leaderboard", "Leaderboard ready")
+        _meta: this.appOnlyDataToolMeta(
+          "Loading leaderboard",
+          "Leaderboard ready"
+        )
       },
-      async ({ limit }) => {
-        const player = await this.getPlayerIdentity();
-
-        try {
-          const leaderboard = await getLeaderboard(
-            this.env.SUS_DB,
-            player.id,
-            limit
-          );
-
-          return jsonResponse({
-            status: "leaderboard-ready",
-            player,
-            leaderboard,
-            nextActions: ["Start another round to climb the leaderboard."]
-          });
-        } catch (error) {
-          return jsonResponse({
-            status: "leaderboard-unavailable",
-            message:
-              error instanceof Error
-                ? error.message
-                : "Leaderboard is unavailable.",
-            player,
-            nextActions: [
-              "Apply the D1 migrations.",
-              "Then finish a round to create a leaderboard entry."
-            ]
-          });
-        }
-      }
+      async ({ limit }) => this.leaderboardResponse(limit)
     );
 
     this.server.registerTool(

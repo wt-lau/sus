@@ -14,14 +14,14 @@ generation, scoring, authentication, and leaderboard persistence.
 ## What Is Implemented
 
 - Remote MCP endpoint at `/mcp`, routed through `src/server.ts`.
-- Interactive HTML widget registered as the `ui://widget/sus-source-cards-v8.html`
+- Interactive HTML widget registered as the `ui://widget/sus-source-cards-v13.html`
   MCP resource from `src/widget.ts`.
 - Per-player game state in the `SusGameMcp` Cloudflare Agent, backed by the
   `SusGameMcp` Durable Object binding.
 - Topic-based rounds using Exa Search when `EXA_API_KEY` is configured.
 - Bundled starter rounds for local demos without live search.
 - Custom rounds from exactly five provided source cards.
-- Workers AI source-spin generation with a local fallback if model output fails.
+- Local source-spin generation for the hidden lie.
 - Optional Workers AI round image generation through `generate_round_asset`.
 - Clerk/OAuth protected-resource metadata at
   `/.well-known/oauth-protected-resource`.
@@ -82,6 +82,7 @@ bundled starter packs, or pass exactly five custom source cards.
 - `guess_sus_source` - evaluates a card accusation.
 - `ask_question` - files an optional clue question.
 - `reveal_round` - reveals the current round.
+- `render_leaderboard` - opens the leaderboard widget.
 - `get_leaderboard` - returns top D1 leaderboard entries and current rank.
 - `reset_game` - returns to welcome or clears score.
 
@@ -200,7 +201,7 @@ is disabled locally, Sus falls back to a dev user from `?user=...`,
 
 The Worker uses the `AI` binding in `wrangler.jsonc`.
 
-- Source-card false spins use `openai/gpt-5.4-mini` through AI Gateway `default`.
+- Source-card false spins are generated locally in `src/game.ts`.
 - Round images use `@cf/black-forest-labs/flux-1-schnell`.
 - Generated images are kept as data URIs in the active Agent state.
 

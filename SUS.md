@@ -30,9 +30,8 @@ This document describes the current implementation in `src/`, not future scope.
 - Exa Search is used for arbitrary topic rounds when `EXA_API_KEY` is present.
 - Exa Answer is used for optional clue questions when `EXA_API_KEY` is present.
 - Local starter packs and local clue hints are available without Exa.
-- Workers AI generates the selected source-card spin for Exa/custom rounds.
-- If Workers AI spin generation fails, `src/game.ts` applies a local wording
-  spin.
+- `src/game.ts` applies a local wording spin for the hidden lie in Exa/custom
+  rounds.
 - Workers AI can generate an optional round image through `generate_round_asset`.
 
 ## Primary Flow
@@ -45,7 +44,7 @@ This document describes the current implementation in `src/`, not future scope.
 5. The user enters a topic or chooses a suggested topic.
 6. The widget calls `start_round` with the topic.
 7. The server asks Exa for candidate sources.
-8. The server asks Workers AI to spin one source claim into a subtle lie.
+8. The server locally spins one source claim into a subtle lie.
 9. The server creates a shuffled five-card round and starts scoring.
 10. The widget renders the source-card board.
 11. The user selects a card.
@@ -65,7 +64,7 @@ This document describes the current implementation in `src/`, not future scope.
 `start_round` supports three implemented modes:
 
 - Topic round: `topic` is present and `sources` is omitted. Sus uses Exa Search,
-  then spins one source with Workers AI or the local fallback.
+  then locally spins one source.
 - Starter round: `topic` and `sources` are omitted. Sus uses one bundled starter
   pack from `src/game.ts`.
 - Custom round: exactly five `sources` are provided. Sus keeps four cards
@@ -207,7 +206,8 @@ comebacks, elimination wins, hot streaks, and clue-heavy wins.
 - `guess_sus_source` evaluates a card accusation.
 - `ask_question` records a clue question and answer.
 - `reveal_round` reveals the answer and records a zero-point reveal if unsolved.
-- `get_leaderboard` reads D1 standings.
+- `render_leaderboard` reads D1 standings and renders the leaderboard widget.
+- `get_leaderboard` reads D1 standings without forcing a widget render.
 - `reset_game` returns to welcome and can optionally clear score.
 
 ## Persistence
