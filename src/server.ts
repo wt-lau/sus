@@ -64,7 +64,7 @@ const MCP_PATH = "/mcp";
 const MCP_TRANSPORT_STATE_KEY = "mcp-transport-state";
 const PLAYER_IDENTITY_STATE_KEY = "player-identity";
 const WORKERS_AI_IMAGE_MODEL = "@cf/black-forest-labs/flux-1-schnell";
-const WORKERS_AI_SPIN_MODEL = "openai/gpt-5.5";
+const WORKERS_AI_SPIN_MODEL = "openai/gpt-5.4-mini";
 const WORKERS_AI_GATEWAY_ID = "default";
 const susWidgetResourceMeta = {
   ui: {
@@ -234,19 +234,19 @@ async function isMcpInitializeRequest(request: Request) {
 
 type RoundPreparation =
   | {
-      round: ReturnType<typeof createRound>;
-      sourceSearch: {
-        mode: "starter-pack" | "provided-sources";
-      };
-    }
-  | {
-      round: ReturnType<typeof createRound>;
-      sourceSearch: {
-        mode: "exa";
-        requestId?: string;
-        query: string;
-      };
+    round: ReturnType<typeof createRound>;
+    sourceSearch: {
+      mode: "starter-pack" | "provided-sources";
     };
+  }
+  | {
+    round: ReturnType<typeof createRound>;
+    sourceSearch: {
+      mode: "exa";
+      requestId?: string;
+      query: string;
+    };
+  };
 
 async function prepareRound(
   topic: string | undefined,
@@ -308,6 +308,7 @@ type WorkersAiChatResponse = {
       content?: string | null;
     };
   }>;
+  result?: WorkersAiChatResponse;
   response?: string;
 };
 
@@ -329,7 +330,7 @@ async function generateSourceSpinWithAi(
         messages: buildSpinMessages(topic, source, sources),
         response_format: { type: "json_object" },
         max_completion_tokens: 420,
-        temperature: 0.45
+        temperature: 1
       },
       {
         gateway: { id: WORKERS_AI_GATEWAY_ID }
@@ -409,7 +410,13 @@ function buildSpinMessages(
 }
 
 function extractAiMessageContent(response: WorkersAiChatResponse) {
-  return response.choices?.[0]?.message?.content ?? response.response ?? null;
+  return (
+    response.choices?.[0]?.message?.content ??
+    response.result?.choices?.[0]?.message?.content ??
+    response.result?.response ??
+    response.response ??
+    null
+  );
 }
 
 function parseJsonFromModelContent(content: string) {
@@ -916,7 +923,9 @@ export class SusGameMcp extends Agent<Env, GameState> {
           idempotentHint: false,
           openWorldHint: true
         },
-        _meta: this.widgetToolMeta("Dealing round", "Round ready")
+        // The widget calls this internally after it is already mounted.
+        // Data-only metadata avoids a host iframe remount after "Open case".
+        _meta: this.dataToolMeta("Dealing round", "Round ready")
       },
       async ({ topic, sources }) => {
         let preparedRound: RoundPreparation;
@@ -1188,11 +1197,11 @@ export class SusGameMcp extends Agent<Env, GameState> {
         );
         const score = solvedByElimination
           ? finishScoredRound(
-              scoreAfterWrongGuess,
-              round,
-              "elimination-win",
-              guess.guessedAt
-            )
+            scoreAfterWrongGuess,
+            round,
+            "elimination-win",
+            guess.guessedAt
+          )
           : scoreAfterWrongGuess;
         const nextState: GameState = {
           ...this.state,
@@ -1343,9 +1352,9 @@ export class SusGameMcp extends Agent<Env, GameState> {
           nextState.status === "revealed"
             ? await this.persistScore(nextState.score)
             : {
-                persisted: false,
-                reason: "Round was already solved before reveal."
-              };
+              persisted: false,
+              reason: "Round was already solved before reveal."
+            };
 
         return jsonResponse({
           status: nextState.status,

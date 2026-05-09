@@ -589,13 +589,12 @@ export const SUS_WIDGET_HTML = `<!doctype html>
         border-radius: var(--radius-md);
         padding: 16px;
         display: grid;
-        grid-template-columns: minmax(0, 1fr) auto;
+        grid-template-columns: 1fr;
         gap: 16px;
         align-items: center;
       }
 
       .score-panel.compact {
-        grid-template-columns: 1fr;
         padding: 14px 16px;
       }
 
@@ -626,25 +625,6 @@ export const SUS_WIDGET_HTML = `<!doctype html>
         font-weight: 600;
         letter-spacing: 0.10em;
         text-transform: uppercase;
-      }
-
-      .score-rank {
-        display: grid;
-        gap: 4px;
-        justify-items: end;
-        text-align: right;
-      }
-
-      .rank-label {
-        color: var(--ink-primary);
-        font-size: 13px;
-        font-weight: 600;
-      }
-
-      .rank-progress {
-        color: var(--ink-tertiary);
-        font-size: 12px;
-        line-height: 1.4;
       }
 
       .score-note {
@@ -1526,15 +1506,6 @@ export const SUS_WIDGET_HTML = `<!doctype html>
           margin-left: 0;
         }
 
-        .score-panel {
-          grid-template-columns: 1fr;
-        }
-
-        .score-rank {
-          justify-items: start;
-          text-align: left;
-        }
-
         .form-row {
           grid-template-columns: 1fr;
         }
@@ -2086,6 +2057,13 @@ export const SUS_WIDGET_HTML = `<!doctype html>
         state.carouselScrollLeft = 0;
         state.flippingCardId = "";
         persistUiState();
+      }
+
+      function resetCaseDraft() {
+        state.topic = "";
+        state.view = "";
+        state.error = "";
+        resetCarouselState();
       }
 
       function getCarouselCards(carousel) {
@@ -2749,7 +2727,6 @@ export const SUS_WIDGET_HTML = `<!doctype html>
 
         const activeRound = score.activeRound || null;
         const lastRound = score.lastRound || null;
-        const rank = score.rank || {};
         const badges =
           lastRound && Array.isArray(lastRound.badges) ? lastRound.badges : [];
         const note = activeRound
@@ -2774,12 +2751,6 @@ export const SUS_WIDGET_HTML = `<!doctype html>
           renderScoreStat(score.bestStreak || 0, "best"),
           renderScoreStat(score.perfectRounds || 0, "perfect"),
           "</div>",
-          '<div class="score-rank">',
-          '<span class="rank-label">' +
-            html(rank.label || "New Investigator") +
-            "</span>",
-          '<span class="rank-progress">' + html(renderRankProgress(rank)) + "</span>",
-          "</div>",
           note ? '<p class="score-note">' + html(note) + "</p>" : "",
           badges.length
             ? '<div class="badge-list">' +
@@ -2800,15 +2771,6 @@ export const SUS_WIDGET_HTML = `<!doctype html>
           '<span class="score-label">' + html(label) + "</span>",
           "</span>"
         ].join("");
-      }
-
-      function renderRankProgress(rank) {
-        if (!rank || !rank.nextLabel) return "Top rank reached";
-        return (
-          String(rank.pointsToNext || 0) +
-          " points to " +
-          String(rank.nextLabel)
-        );
       }
 
       function renderCards(cards, isComplete) {
@@ -3264,6 +3226,7 @@ export const SUS_WIDGET_HTML = `<!doctype html>
               await startTopicRound();
             }
             if (action === "welcome") {
+              resetCaseDraft();
               await runTool("reset_game", {}, "Resetting");
             }
             if (action === "reveal") {

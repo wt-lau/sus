@@ -200,7 +200,7 @@ is disabled locally, Sus falls back to a dev user from `?user=...`,
 
 The Worker uses the `AI` binding in `wrangler.jsonc`.
 
-- Source-card false spins use `openai/gpt-5.5` through AI Gateway `default`.
+- Source-card false spins use `openai/gpt-5.4-mini` through AI Gateway `default`.
 - Round images use `@cf/black-forest-labs/flux-1-schnell`.
 - Generated images are kept as data URIs in the active Agent state.
 
