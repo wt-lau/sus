@@ -30,6 +30,9 @@
   "observability": {
     "enabled": true
   },
+  "secrets": {
+    "required": ["EXA_API_KEY"]
+  },
   "upload_source_maps": true
   /**
    * Smart Placement

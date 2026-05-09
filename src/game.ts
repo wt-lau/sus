@@ -11,9 +11,21 @@ type RawSourceCard = {
   excerpt: string;
   published: string;
   credibilitySignal: string;
+  url?: string;
   verdict: SourceVerdict;
   explanation: string;
   questionHints: string[];
+};
+
+export type SourceSeed = {
+  sourceName: string;
+  sourceType: string;
+  headline: string;
+  claim: string;
+  excerpt: string;
+  published?: string;
+  credibilitySignal?: string;
+  url?: string;
 };
 
 export type SourceCard = RawSourceCard & {
@@ -32,6 +44,7 @@ type TopicPack = {
 export type Round = {
   id: string;
   topic: string;
+  sourceMode: "starter-pack" | "provided-sources";
   sourcePackTopic: string;
   requestedTopic: string | null;
   prompt: string;
@@ -55,6 +68,10 @@ export type QuestionRecord = {
 };
 
 export type GameState = {
+  session: {
+    id: string;
+    startedAt: string;
+  } | null;
   status: "idle" | "active" | "won" | "revealed";
   round: Round | null;
   eliminatedIds: CardId[];
@@ -502,6 +519,7 @@ const TOPIC_PACKS: TopicPack[] = [
 
 export function createInitialGameState(): GameState {
   return {
+    session: null,
     status: "idle",
     round: null,
     eliminatedIds: [],
@@ -528,27 +546,44 @@ export function normalizeCardId(value: string): CardId | undefined {
   return CARD_IDS.find((id) => id === normalized);
 }
 
-export function createRound(topic?: string): Round {
+export function createRound(topic?: string, sourceSeeds?: SourceSeed[]): Round {
   const requestedTopic = topic?.trim() || null;
+  const providedCards = createCardsFromSourceSeeds(requestedTopic, sourceSeeds);
+  const sourceMode = providedCards ? "provided-sources" : "starter-pack";
   const pack = findTopicPack(requestedTopic) ?? TOPIC_PACKS[0];
-  const cards = shuffle(pack.cards).map((card, index) => ({
+  const topicLabel = providedCards
+    ? (requestedTopic ?? "Custom source pack")
+    : pack.topic;
+  const sourceCards = providedCards ?? pack.cards;
+  const cards = shuffle(sourceCards).map((card, index) => ({
     ...card,
     id: CARD_IDS[index]
   }));
   const lie = cards.find((card) => card.verdict === "lie");
 
   if (!lie) {
-    throw new Error(`Topic pack '${pack.topic}' is missing a lie card.`);
+    throw new Error(`Topic '${topicLabel}' is missing a lie card.`);
   }
 
   return {
     id: crypto.randomUUID(),
-    topic: pack.topic,
-    sourcePackTopic: pack.topic,
+    topic: topicLabel,
+    sourceMode,
+    sourcePackTopic:
+      sourceMode === "provided-sources" ? "provided sources" : pack.topic,
     requestedTopic,
-    prompt: pack.prompt,
-    artPrompt: pack.artPrompt,
-    clipPrompt: pack.clipPrompt,
+    prompt:
+      sourceMode === "provided-sources"
+        ? `Five cards discuss ${requestedTopic ?? "the selected topic"}. Four preserve the source claim; one adds a minor spin that makes it false.`
+        : pack.prompt,
+    artPrompt:
+      sourceMode === "provided-sources"
+        ? "Editorial source-checking board with five evidence cards, one subtly distorted by a red herring annotation."
+        : pack.artPrompt,
+    clipPrompt:
+      sourceMode === "provided-sources"
+        ? "Short reveal animation: five evidence cards shuffle, truthful cards stamp verified, and the spun card peels back."
+        : pack.clipPrompt,
     cards,
     lieId: lie.id
   };
@@ -562,6 +597,7 @@ export function toPublicRound(round: Round, state: GameState) {
   const remainingIds = new Set(
     getRemainingCards(round, state.eliminatedIds).map((card) => card.id)
   );
+  const isComplete = state.status === "won" || state.status === "revealed";
 
   return {
     id: round.id,
@@ -569,7 +605,8 @@ export function toPublicRound(round: Round, state: GameState) {
     requestedTopic: round.requestedTopic,
     sourcePackTopic: round.sourcePackTopic,
     prompt: round.prompt,
-    starterMode: true,
+    sourceMode: round.sourceMode,
+    starterMode: round.sourceMode === "starter-pack",
     futureAssets: {
       artPrompt: round.artPrompt,
       clipPrompt: round.clipPrompt,
@@ -586,7 +623,12 @@ export function toPublicRound(round: Round, state: GameState) {
       excerpt: card.excerpt,
       published: card.published,
       credibilitySignal: card.credibilitySignal,
-      status: remainingIds.has(card.id) ? "remaining" : "cleared"
+      url: card.url,
+      status: isComplete
+        ? card.verdict
+        : remainingIds.has(card.id)
+          ? "remaining"
+          : "cleared"
     }))
   };
 }
@@ -603,6 +645,7 @@ export function revealRound(round: Round, state: GameState) {
       id: card.id,
       sourceName: card.sourceName,
       headline: card.headline,
+      url: card.url,
       verdict: card.verdict,
       explanation: card.explanation
     }))
@@ -642,6 +685,148 @@ function findTopicPack(requestedTopic: string | null) {
     if (normalized.includes(normalizeTopic(pack.topic))) return true;
     return pack.aliases.some((alias) => normalizeTopic(alias) === normalized);
   });
+}
+
+function createCardsFromSourceSeeds(
+  requestedTopic: string | null,
+  sourceSeeds?: SourceSeed[]
+): RawSourceCard[] | null {
+  const cleanedSeeds = sourceSeeds
+    ?.map(cleanSourceSeed)
+    .filter((seed): seed is SourceSeed => Boolean(seed));
+
+  if (!cleanedSeeds || cleanedSeeds.length !== CARD_IDS.length) {
+    return null;
+  }
+
+  const lieIndex = Math.floor(Math.random() * cleanedSeeds.length);
+
+  return cleanedSeeds.map((seed, index) => {
+    if (index === lieIndex) {
+      return createSpunLie(seed, requestedTopic);
+    }
+
+    return {
+      sourceName: seed.sourceName,
+      sourceType: seed.sourceType,
+      headline: seed.headline,
+      claim: seed.claim,
+      excerpt: seed.excerpt,
+      published: seed.published ?? "Unknown date",
+      credibilitySignal:
+        seed.credibilitySignal ??
+        "Keeps the claim scoped to the evidence in the source.",
+      url: seed.url,
+      verdict: "truth",
+      explanation: `This card is truthful: it preserves the source claim from ${seed.sourceName}.`,
+      questionHints: [
+        "This card keeps a bounded claim bounded.",
+        "Look for whether the wording adds certainty that the source did not support."
+      ]
+    };
+  });
+}
+
+function cleanSourceSeed(
+  sourceSeed: SourceSeed | undefined
+): SourceSeed | null {
+  if (!sourceSeed) return null;
+
+  const cleaned = {
+    sourceName: sourceSeed.sourceName?.trim(),
+    sourceType: sourceSeed.sourceType?.trim(),
+    headline: sourceSeed.headline?.trim(),
+    claim: sourceSeed.claim?.trim(),
+    excerpt: sourceSeed.excerpt?.trim(),
+    published: sourceSeed.published?.trim(),
+    credibilitySignal: sourceSeed.credibilitySignal?.trim(),
+    url: sourceSeed.url?.trim()
+  };
+
+  if (
+    !cleaned.sourceName ||
+    !cleaned.sourceType ||
+    !cleaned.headline ||
+    !cleaned.claim ||
+    !cleaned.excerpt
+  ) {
+    return null;
+  }
+
+  return {
+    sourceName: cleaned.sourceName,
+    sourceType: cleaned.sourceType,
+    headline: cleaned.headline,
+    claim: cleaned.claim,
+    excerpt: cleaned.excerpt,
+    published: cleaned.published || undefined,
+    credibilitySignal: cleaned.credibilitySignal || undefined,
+    url: cleaned.url || undefined
+  };
+}
+
+function createSpunLie(
+  sourceSeed: SourceSeed,
+  requestedTopic: string | null
+): RawSourceCard {
+  const spin = applyMinorSpin(sourceSeed.claim);
+  const topicLabel = requestedTopic ?? "this topic";
+
+  return {
+    sourceName: sourceSeed.sourceName,
+    sourceType: sourceSeed.sourceType,
+    headline: addSpinToHeadline(sourceSeed.headline),
+    claim: spin.claim,
+    excerpt: `The source is framed as saying the finding applies without meaningful limits: ${sourceSeed.excerpt}`,
+    published: sourceSeed.published ?? "Unknown date",
+    credibilitySignal:
+      "The source shape looks plausible, but the wording turns bounded evidence into an absolute claim.",
+    url: sourceSeed.url,
+    verdict: "lie",
+    explanation: `This is the lie: it adds a minor but material spin to ${sourceSeed.sourceName}, overstating what the source supports about ${topicLabel}.`,
+    questionHints: [
+      "The suspicious move is the jump from bounded evidence to absolute language.",
+      "Compare the card's certainty against the source-style caveats in the other cards."
+    ]
+  };
+}
+
+function applyMinorSpin(claim: string) {
+  const replacements: Array<[RegExp, string]> = [
+    [/\bmay\b/i, "always"],
+    [/\bcan\b/i, "always"],
+    [/\boften\b/i, "always"],
+    [/\bsome\b/i, "all"],
+    [/\bseveral\b/i, "all"],
+    [/\bassociated with\b/i, "guarantees"],
+    [/\breduces?\b/i, "eliminates"],
+    [/\bhelps?\b/i, "solves"]
+  ];
+
+  for (const [pattern, replacement] of replacements) {
+    if (pattern.test(claim)) {
+      return {
+        claim: claim.replace(pattern, replacement)
+      };
+    }
+  }
+
+  const trimmedClaim = claim.trim();
+  return {
+    claim: `${trimmedClaim.replace(/[.!?]$/, "")} in every case, without meaningful exceptions.`
+  };
+}
+
+function addSpinToHeadline(headline: string) {
+  if (/\bmay\b|\bcan\b|\bsome\b|\boften\b/i.test(headline)) {
+    return headline
+      .replace(/\bmay\b/i, "always")
+      .replace(/\bcan\b/i, "always")
+      .replace(/\bsome\b/i, "all")
+      .replace(/\boften\b/i, "always");
+  }
+
+  return `${headline}: no exceptions found`;
 }
 
 function normalizeTopic(topic: string) {
