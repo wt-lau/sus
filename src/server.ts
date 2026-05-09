@@ -1,232 +1,415 @@
-import { createWorkersAI } from "workers-ai-provider";
-import { callable, routeAgentRequest, type Schedule } from "agents";
-import { getSchedulePrompt, scheduleSchema } from "agents/schedule";
-import { AIChatAgent, type OnChatMessageOptions } from "@cloudflare/ai-chat";
-import {
-  convertToModelMessages,
-  pruneMessages,
-  stepCountIs,
-  streamText,
-  tool,
-  type ModelMessage
-} from "ai";
+import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import { McpAgent } from "agents/mcp";
 import { z } from "zod";
+import {
+  answerQuestion,
+  createInitialGameState,
+  createRound,
+  getRemainingCards,
+  listTopics,
+  normalizeCardId,
+  revealRound,
+  toPublicRound,
+  type GameState
+} from "./game";
 
-/**
- * The AI SDK's downloadAssets step runs `new URL(data)` on every file
- * part's string data. Data URIs parse as valid URLs, so it tries to
- * HTTP-fetch them and fails. Decode to Uint8Array so the SDK treats
- * them as inline data instead.
- */
-function inlineDataUrls(messages: ModelMessage[]): ModelMessage[] {
-  return messages.map((msg) => {
-    if (msg.role !== "user" || typeof msg.content === "string") return msg;
-    return {
-      ...msg,
-      content: msg.content.map((part) => {
-        if (part.type !== "file" || typeof part.data !== "string") return part;
-        const match = part.data.match(/^data:([^;]+);base64,(.+)$/);
-        if (!match) return part;
-        const bytes = Uint8Array.from(atob(match[2]), (c) => c.charCodeAt(0));
-        return { ...part, data: bytes, mediaType: match[1] };
-      })
-    };
+function jsonResponse(value: unknown) {
+  return {
+    content: [
+      {
+        type: "text" as const,
+        text: JSON.stringify(value, null, 2)
+      }
+    ]
+  };
+}
+
+function noRoundResponse() {
+  return jsonResponse({
+    status: "idle",
+    message: "No round is active. Call start_round to begin.",
+    nextActions: ["list_topics", "start_round"]
   });
 }
 
-export class ChatAgent extends AIChatAgent<Env> {
-  maxPersistedMessages = 100;
+export class SusGameMcp extends McpAgent<
+  Env,
+  GameState,
+  Record<string, never>
+> {
+  server = new McpServer({
+    name: "sus-source-checking-game",
+    version: "0.1.0"
+  });
 
-  onStart() {
-    // Configure OAuth popup behavior for MCP servers that require authentication
-    this.mcp.configureOAuthCallback({
-      customHandler: (result) => {
-        if (result.authSuccess) {
-          return new Response("<script>window.close();</script>", {
-            headers: { "content-type": "text/html" },
-            status: 200
+  initialState: GameState = createInitialGameState();
+
+  async init() {
+    this.server.registerTool(
+      "get_rules",
+      {
+        title: "Get Sus rules",
+        description: "Explain how to play Sus, the source-checking game.",
+        inputSchema: {}
+      },
+      async () =>
+        jsonResponse({
+          name: "Sus",
+          tagline: "Four truths. One lie. Find the sus source.",
+          rules: [
+            "Each round starts with one topic and five source cards.",
+            "Four cards are truthful. One card is the lie.",
+            "Guess the lie with guess_sus_source.",
+            "If you pick a truthful card, that card is cleared and you must ask one question before guessing again.",
+            "Use ask_question to get source-quality clues about the remaining cards."
+          ],
+          starterNote:
+            "This first local version uses bundled starter rounds. Exa, Fal, and R2 are intentionally not required yet."
+        })
+    );
+
+    this.server.registerTool(
+      "list_topics",
+      {
+        title: "List starter topics",
+        description: "Show the bundled Sus starter topics available locally.",
+        inputSchema: {}
+      },
+      async () =>
+        jsonResponse({
+          topics: listTopics(),
+          note: "Pass one of these topics to start_round. Unknown topics use the first starter pack until live topic generation is added."
+        })
+    );
+
+    this.server.registerTool(
+      "start_round",
+      {
+        title: "Start a Sus round",
+        description:
+          "Start a new source-checking round with five source cards: four truths and one lie.",
+        inputSchema: {
+          topic: z
+            .string()
+            .min(1)
+            .max(80)
+            .optional()
+            .describe("Optional starter topic, for example 'Ocean plastic'.")
+        }
+      },
+      async ({ topic }) => {
+        const round = createRound(topic);
+        const previousScore =
+          this.state?.score ?? createInitialGameState().score;
+        const nextState: GameState = {
+          ...createInitialGameState(),
+          status: "active",
+          round,
+          score: {
+            ...previousScore,
+            roundsStarted: previousScore.roundsStarted + 1
+          }
+        };
+
+        this.setState(nextState);
+
+        return jsonResponse({
+          message: `Round started: ${round.topic}`,
+          round: toPublicRound(round, nextState),
+          nextActions: [
+            "Review the five cards.",
+            "Call guess_sus_source with the card ID you think is lying."
+          ]
+        });
+      }
+    );
+
+    this.server.registerTool(
+      "get_round",
+      {
+        title: "Get current round",
+        description:
+          "Show the active round, remaining cards, guesses, and whether a question is required.",
+        inputSchema: {}
+      },
+      async () => {
+        if (!this.state.round) return noRoundResponse();
+
+        return jsonResponse({
+          status: this.state.status,
+          round: toPublicRound(this.state.round, this.state),
+          guesses: this.state.guesses,
+          questions: this.state.questions,
+          score: this.state.score,
+          nextActions: this.state.pendingQuestion
+            ? ["Call ask_question before guessing again."]
+            : ["Call guess_sus_source when you are ready."]
+        });
+      }
+    );
+
+    this.server.registerTool(
+      "guess_sus_source",
+      {
+        title: "Guess the lie",
+        description:
+          "Pick the source card you think is lying. If the card is truthful, it is cleared and you earn one question.",
+        inputSchema: {
+          cardId: z
+            .string()
+            .min(1)
+            .max(8)
+            .describe("The visible card ID, such as A, B, C, D, or E.")
+        }
+      },
+      async ({ cardId }) => {
+        const round = this.state.round;
+        if (!round) return noRoundResponse();
+
+        if (this.state.status !== "active") {
+          return jsonResponse({
+            status: this.state.status,
+            message: "This round is already complete.",
+            reveal: revealRound(round, this.state)
           });
         }
-        return new Response(
-          `Authentication Failed: ${result.authError || "Unknown error"}`,
-          { headers: { "content-type": "text/plain" }, status: 400 }
-        );
+
+        if (this.state.pendingQuestion) {
+          return jsonResponse({
+            status: "question-required",
+            message:
+              "You cleared a truthful source on the previous guess. Ask one question before guessing again.",
+            nextActions: ["ask_question"]
+          });
+        }
+
+        const normalizedCardId = normalizeCardId(cardId);
+        const card = normalizedCardId
+          ? round.cards.find((candidate) => candidate.id === normalizedCardId)
+          : undefined;
+
+        if (!card) {
+          return jsonResponse({
+            status: "invalid-card",
+            message: `Card '${cardId}' is not in this round.`,
+            validCardIds: round.cards.map((candidate) => candidate.id)
+          });
+        }
+
+        if (this.state.eliminatedIds.includes(card.id)) {
+          return jsonResponse({
+            status: "already-cleared",
+            message: `Card ${card.id} has already been cleared as truthful.`,
+            round: toPublicRound(round, this.state)
+          });
+        }
+
+        const guess = {
+          cardId: card.id,
+          sourceName: card.sourceName,
+          result: card.verdict,
+          guessedAt: new Date().toISOString()
+        } as const;
+
+        if (card.verdict === "lie") {
+          const nextState: GameState = {
+            ...this.state,
+            status: "won",
+            guesses: [...this.state.guesses, guess],
+            pendingQuestion: false,
+            score: {
+              ...this.state.score,
+              wins: this.state.score.wins + 1
+            }
+          };
+          this.setState(nextState);
+
+          return jsonResponse({
+            status: "won",
+            message: `Correct. Card ${card.id} is the sus source.`,
+            reveal: revealRound(round, nextState),
+            nextActions: ["start_round"]
+          });
+        }
+
+        const eliminatedIds = [...this.state.eliminatedIds, card.id];
+        const remainingCards = getRemainingCards(round, eliminatedIds);
+        const solvedByElimination =
+          remainingCards.length === 1 && remainingCards[0]?.verdict === "lie";
+        const nextState: GameState = {
+          ...this.state,
+          status: solvedByElimination ? "won" : "active",
+          eliminatedIds,
+          guesses: [...this.state.guesses, guess],
+          pendingQuestion: solvedByElimination ? false : true,
+          score: {
+            ...this.state.score,
+            wins: this.state.score.wins + (solvedByElimination ? 1 : 0),
+            wrongGuesses: this.state.score.wrongGuesses + 1
+          }
+        };
+        this.setState(nextState);
+
+        if (solvedByElimination) {
+          return jsonResponse({
+            status: "won",
+            message:
+              "That source checks out. It was the last truthful card, so the remaining card is the sus source.",
+            reveal: revealRound(round, nextState),
+            nextActions: ["start_round"]
+          });
+        }
+
+        return jsonResponse({
+          status: "truth-cleared",
+          message: `Card ${card.id} checks out and has been removed from the suspect pool.`,
+          clearedCard: {
+            id: card.id,
+            sourceName: card.sourceName,
+            explanation: card.explanation
+          },
+          round: toPublicRound(round, nextState),
+          nextActions: ["Call ask_question before guessing again."]
+        });
       }
-    });
-  }
+    );
 
-  @callable()
-  async addServer(name: string, url: string) {
-    return await this.addMcpServer(name, url);
-  }
-
-  @callable()
-  async removeServer(serverId: string) {
-    await this.removeMcpServer(serverId);
-  }
-
-  async onChatMessage(_onFinish: unknown, options?: OnChatMessageOptions) {
-    const mcpTools = this.mcp.getAITools();
-    const workersai = createWorkersAI({ binding: this.env.AI });
-
-    const result = streamText({
-      model: workersai("@cf/moonshotai/kimi-k2.6", {
-        sessionAffinity: this.sessionAffinity
-      }),
-      system: `You are a helpful assistant that can understand images. You can check the weather, get the user's timezone, run calculations, and schedule tasks. When users share images, describe what you see and answer questions about them.
-
-${getSchedulePrompt({ date: new Date() })}
-
-If the user asks to schedule a task, use the schedule tool to schedule the task.`,
-      // Prune old tool calls to save tokens on long conversations
-      messages: pruneMessages({
-        messages: inlineDataUrls(await convertToModelMessages(this.messages)),
-        toolCalls: "before-last-2-messages"
-      }),
-      tools: {
-        // MCP tools from connected servers
-        ...mcpTools,
-
-        // Server-side tool: runs automatically on the server
-        getWeather: tool({
-          description: "Get the current weather for a city",
-          inputSchema: z.object({
-            city: z.string().describe("City name")
-          }),
-          execute: async ({ city }) => {
-            // Replace with a real weather API in production
-            const conditions = ["sunny", "cloudy", "rainy", "snowy"];
-            const temp = Math.floor(Math.random() * 30) + 5;
-            return {
-              city,
-              temperature: temp,
-              condition:
-                conditions[Math.floor(Math.random() * conditions.length)],
-              unit: "celsius"
-            };
-          }
-        }),
-
-        // Client-side tool: no execute function — the browser handles it
-        getUserTimezone: tool({
-          description:
-            "Get the user's timezone from their browser. Use this when you need to know the user's local time.",
-          inputSchema: z.object({})
-        }),
-
-        // Approval tool: requires user confirmation before executing
-        calculate: tool({
-          description:
-            "Perform a math calculation with two numbers. Requires user approval for large numbers.",
-          inputSchema: z.object({
-            a: z.number().describe("First number"),
-            b: z.number().describe("Second number"),
-            operator: z
-              .enum(["+", "-", "*", "/", "%"])
-              .describe("Arithmetic operator")
-          }),
-          needsApproval: async ({ a, b }) =>
-            Math.abs(a) > 1000 || Math.abs(b) > 1000,
-          execute: async ({ a, b, operator }) => {
-            const ops: Record<string, (x: number, y: number) => number> = {
-              "+": (x, y) => x + y,
-              "-": (x, y) => x - y,
-              "*": (x, y) => x * y,
-              "/": (x, y) => x / y,
-              "%": (x, y) => x % y
-            };
-            if (operator === "/" && b === 0) {
-              return { error: "Division by zero" };
-            }
-            return {
-              expression: `${a} ${operator} ${b}`,
-              result: ops[operator](a, b)
-            };
-          }
-        }),
-
-        scheduleTask: tool({
-          description:
-            "Schedule a task to be executed at a later time. Use this when the user asks to be reminded or wants something done later.",
-          inputSchema: scheduleSchema,
-          execute: async ({ when, description }) => {
-            if (when.type === "no-schedule") {
-              return "Not a valid schedule input";
-            }
-            const input =
-              when.type === "scheduled"
-                ? when.date
-                : when.type === "delayed"
-                  ? when.delayInSeconds
-                  : when.type === "cron"
-                    ? when.cron
-                    : null;
-            if (!input) return "Invalid schedule type";
-            try {
-              this.schedule(input, "executeTask", description, {
-                idempotent: true
-              });
-              return `Task scheduled: "${description}" (${when.type}: ${input})`;
-            } catch (error) {
-              return `Error scheduling task: ${error}`;
-            }
-          }
-        }),
-
-        getScheduledTasks: tool({
-          description: "List all tasks that have been scheduled",
-          inputSchema: z.object({}),
-          execute: async () => {
-            const tasks = this.getSchedules();
-            return tasks.length > 0 ? tasks : "No scheduled tasks found.";
-          }
-        }),
-
-        cancelScheduledTask: tool({
-          description: "Cancel a scheduled task by its ID",
-          inputSchema: z.object({
-            taskId: z.string().describe("The ID of the task to cancel")
-          }),
-          execute: async ({ taskId }) => {
-            try {
-              this.cancelSchedule(taskId);
-              return `Task ${taskId} cancelled.`;
-            } catch (error) {
-              return `Error cancelling task: ${error}`;
-            }
-          }
-        })
+    this.server.registerTool(
+      "ask_question",
+      {
+        title: "Ask a source-checking question",
+        description:
+          "Ask one question after clearing a truthful card. The answer gives clues about the remaining cards.",
+        inputSchema: {
+          question: z
+            .string()
+            .min(3)
+            .max(240)
+            .describe("A source-checking question about the remaining cards.")
+        }
       },
-      stopWhen: stepCountIs(5),
-      abortSignal: options?.abortSignal
-    });
+      async ({ question }) => {
+        const round = this.state.round;
+        if (!round) return noRoundResponse();
 
-    return result.toUIMessageStreamResponse();
-  }
+        if (this.state.status !== "active") {
+          return jsonResponse({
+            status: this.state.status,
+            message: "This round is already complete.",
+            reveal: revealRound(round, this.state)
+          });
+        }
 
-  async executeTask(description: string, _task: Schedule<string>) {
-    // Do the actual work here (send email, call API, etc.)
-    console.log(`Executing scheduled task: ${description}`);
+        if (!this.state.pendingQuestion) {
+          return jsonResponse({
+            status: "no-question-earned",
+            message:
+              "Questions unlock only after you guess a truthful source. Make a guess first.",
+            nextActions: ["guess_sus_source"]
+          });
+        }
 
-    // Notify connected clients via a broadcast event.
-    // We use broadcast() instead of saveMessages() to avoid injecting
-    // into chat history — that would cause the AI to see the notification
-    // as new context and potentially loop.
-    this.broadcast(
-      JSON.stringify({
-        type: "scheduled-task",
-        description,
-        timestamp: new Date().toISOString()
-      })
+        const answer = answerQuestion(
+          round,
+          question,
+          this.state.eliminatedIds
+        );
+        const nextState: GameState = {
+          ...this.state,
+          pendingQuestion: false,
+          questions: [
+            ...this.state.questions,
+            {
+              question,
+              answer: answer.summary,
+              askedAt: new Date().toISOString()
+            }
+          ]
+        };
+        this.setState(nextState);
+
+        return jsonResponse({
+          status: "question-answered",
+          answer,
+          round: toPublicRound(round, nextState),
+          nextActions: ["Call guess_sus_source with your next suspect."]
+        });
+      }
+    );
+
+    this.server.registerTool(
+      "reveal_round",
+      {
+        title: "Reveal the current round",
+        description: "Give up and reveal which card was lying.",
+        inputSchema: {}
+      },
+      async () => {
+        const round = this.state.round;
+        if (!round) return noRoundResponse();
+
+        const nextState: GameState = {
+          ...this.state,
+          status: this.state.status === "won" ? "won" : "revealed",
+          pendingQuestion: false
+        };
+        this.setState(nextState);
+
+        return jsonResponse({
+          status: nextState.status,
+          reveal: revealRound(round, nextState),
+          nextActions: ["start_round"]
+        });
+      }
+    );
+
+    this.server.registerTool(
+      "reset_game",
+      {
+        title: "Reset Sus",
+        description: "Clear the current round. Optionally clear the score too.",
+        inputSchema: {
+          clearScore: z
+            .boolean()
+            .optional()
+            .describe(
+              "Set true to reset wins, wrong guesses, and rounds started."
+            )
+        }
+      },
+      async ({ clearScore }) => {
+        const previousScore = this.state.score;
+        const nextState = createInitialGameState();
+        if (!clearScore) {
+          nextState.score = previousScore;
+        }
+        this.setState(nextState);
+
+        return jsonResponse({
+          status: "idle",
+          score: nextState.score,
+          nextActions: ["list_topics", "start_round"]
+        });
+      }
     );
   }
 }
 
+const mcpHandler = SusGameMcp.serve("/mcp", { binding: "SusGameMcp" });
+
 export default {
-  async fetch(request: Request, env: Env) {
-    return (
-      (await routeAgentRequest(request, env)) ||
-      new Response("Not found", { status: 404 })
-    );
+  async fetch(request: Request, env: Env, ctx: ExecutionContext) {
+    const url = new URL(request.url);
+
+    if (url.pathname === "/") {
+      return new Response(
+        "Sus MCP server is running. Connect an MCP client to /mcp.",
+        {
+          headers: { "content-type": "text/plain; charset=utf-8" }
+        }
+      );
+    }
+
+    return mcpHandler.fetch(request, env, ctx);
   }
 } satisfies ExportedHandler<Env>;

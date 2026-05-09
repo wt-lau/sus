@@ -1,0 +1,3 @@
+[mcp_servers.sus]
+url = "http://localhost:8787/mcp"
+enabled = true

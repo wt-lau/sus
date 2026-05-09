@@ -1,8 +1,8 @@
 {
-  "name": "agent-starter",
+  "name": "sus",
   "version": "1.0.0",
   "private": true,
-  "description": "Starter template for building AI chat agents on Cloudflare",
+  "description": "A source-checking remote MCP game on Cloudflare Agents",
   "keywords": [
     "agents",
     "ai",
@@ -11,9 +11,11 @@
   "license": "MIT",
   "type": "module",
   "scripts": {
-    "dev": "vite dev",
-    "start": "vite dev",
-    "deploy": "vite build && wrangler deploy",
+    "dev": "wrangler dev",
+    "start": "wrangler dev",
+    "ui:dev": "vite dev",
+    "inspect": "npx @modelcontextprotocol/inspector@latest",
+    "deploy": "wrangler deploy",
     "types": "wrangler types env.d.ts --include-runtime false",
     "format": "oxfmt --write .",
     "lint": "oxlint src/",
@@ -22,6 +24,7 @@
   "dependencies": {
     "@cloudflare/ai-chat": "^0.6.2",
     "@cloudflare/kumo": "^1.19.0",
+    "@modelcontextprotocol/sdk": "^1.29.0",
     "@phosphor-icons/react": "^2.1.10",
     "@streamdown/code": "^1.1.1",
     "agents": "^0.12.2",
