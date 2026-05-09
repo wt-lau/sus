@@ -1,5 +1,7 @@
 # Sus
 
+Demo video: https://youtu.be/rvI-mPSsg6M
+
 **Four truths. One lie. Find the sus source.**
 
 Sus is a ChatGPT-hosted source-checking game. A player chooses a topic, Sus
@@ -160,6 +162,46 @@ Connect the inspector to `http://localhost:8787/mcp`, then call:
 5. `guess_sus_source`
 6. `ask_question` if you want a clue
 7. `reveal_round` or `reset_game`
+
+## ChatGPT Setup
+
+Use the deployed HTTPS MCP endpoint for ChatGPT:
+
+```text
+https://sus.wt-lau.workers.dev/mcp
+```
+
+1. In ChatGPT, enable developer mode from
+   **Settings -> Apps & Connectors -> Advanced settings**.
+2. Go to **Settings -> Apps & Connectors -> Create**.
+3. Enter the connector details:
+   - **Connector name:** `Sus`
+   - **Description:** `A source-checking game where ChatGPT hosts the round and
+     an interactive widget deals five source cards. Use Sus to play four
+     truths and one lie with live or starter sources.`
+   - **Connector URL:** `https://sus.wt-lau.workers.dev/mcp`
+4. Click **Create**. If prompted, complete the Clerk/OAuth sign-in flow.
+5. Open a new chat, click **+**, choose **More**, and select **Sus** from the
+   available tools.
+6. Ask ChatGPT to start the game, for example:
+
+```text
+Start Sus.
+```
+
+or:
+
+```text
+Start a Sus round about battery recycling.
+```
+
+For local ChatGPT testing, the MCP server still needs a public HTTPS URL.
+Either deploy the Worker with `bun run deploy`, or expose `bun run dev` through
+Cloudflare Tunnel or ngrok and use that tunnel's `/mcp` URL. Keep using MCP
+Inspector for direct `http://localhost:8787/mcp` testing.
+
+After changing tools, descriptions, or widget metadata, redeploy the Worker and
+refresh the connector metadata from ChatGPT settings.
 
 ## D1 Leaderboard
 
