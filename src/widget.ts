@@ -143,7 +143,7 @@ export const SUS_WIDGET_HTML = `
         align-items: stretch;
         display: grid;
         gap: 16px;
-        grid-template-columns: minmax(0, 1fr) minmax(300px, 0.64fr);
+        grid-template-columns: minmax(320px, 0.72fr) minmax(0, 1fr);
       }
 
       .hero,
@@ -204,30 +204,19 @@ export const SUS_WIDGET_HTML = `
         background: #fbfffb;
         border: 1px solid rgba(23, 25, 24, 0.14);
         border-radius: 8px;
-        color: var(--accent);
         display: inline-flex;
-        font-family:
-          "Iowan Old Style", "Palatino Linotype", Georgia, serif;
-        font-size: 15px;
-        font-weight: 700;
         height: 72px;
         justify-content: center;
-        letter-spacing: 0.08em;
+        overflow: hidden;
         position: relative;
-        text-transform: uppercase;
         width: 72px;
       }
 
-      .case-mark::before {
-        background: var(--gold);
-        border: 2px solid var(--panel);
-        border-radius: 999px;
-        content: "";
-        height: 12px;
-        position: absolute;
-        right: -3px;
-        top: 7px;
-        width: 12px;
+      .case-mark img {
+        display: block;
+        height: 100%;
+        object-fit: cover;
+        width: 100%;
       }
 
       .eyebrow {
@@ -331,7 +320,7 @@ export const SUS_WIDGET_HTML = `
       }
 
       .case-panel {
-        align-content: space-between;
+        align-content: start;
         display: grid;
         gap: 22px;
         min-height: 430px;
@@ -341,6 +330,22 @@ export const SUS_WIDGET_HTML = `
       .case-panel-header {
         display: grid;
         gap: 8px;
+      }
+
+      .panel-heading {
+        align-items: center;
+        display: flex;
+        gap: 12px;
+      }
+
+      .panel-icon {
+        background: #fbfffb;
+        border: 1px solid rgba(204, 215, 211, 0.9);
+        border-radius: 8px;
+        display: block;
+        height: 48px;
+        object-fit: cover;
+        width: 48px;
       }
 
       .muted {
@@ -366,7 +371,7 @@ export const SUS_WIDGET_HTML = `
       .topic-actions {
         display: grid;
         gap: 8px;
-        grid-template-columns: minmax(0, 1fr) auto;
+        grid-template-columns: 1fr;
       }
 
       .suggestions {
@@ -384,29 +389,11 @@ export const SUS_WIDGET_HTML = `
         padding: 6px 10px;
       }
 
-      .dossier {
-        border-top: 1px solid var(--line);
-        display: grid;
-        gap: 11px;
-        padding-top: 16px;
-      }
-
-      .dossier-row {
-        display: grid;
-        gap: 10px;
-        grid-template-columns: 90px minmax(0, 1fr);
-      }
-
       .dossier-label {
         color: var(--muted);
         font-size: 12px;
         font-weight: 800;
         text-transform: uppercase;
-      }
-
-      .dossier-value {
-        font-size: 13px;
-        line-height: 1.42;
       }
 
       .error {
@@ -1068,28 +1055,15 @@ export const SUS_WIDGET_HTML = `
         const showError = state.error || status === "exa-search-failed";
         return [
           '<section class="welcome">',
-          '<div class="hero">',
-          '<div class="hero-content">',
-          '<div class="case-mark">Sus</div>',
-          '<p class="eyebrow">Four truths · one lie</p>',
-          "<h1>Spot the tiny false spin.</h1>",
-          '<p class="lede">Choose any topic. Sus deals five credible source cards; four stay careful, one quietly turns a caveat into certainty.</p>',
-          '<div class="intro-flow" aria-label="How Sus works">',
-          renderIntroStep("1", "Pick a case", "Start from a topic or one of the suggested cases."),
-          renderIntroStep("2", "Compare wording", "Look for absolute claims, missing caveats, weak mechanisms, or broad scope."),
-          renderIntroStep("3", "Accuse one card", "Wrong guesses clear truth and unlock one clue question."),
-          "</div>",
-          "</div>",
-          '<div class="case-stack" aria-hidden="true">',
-          renderFileStrip("A", "careful claim", "verified"),
-          renderFileStrip("B", "missing caveat", "suspect"),
-          renderFileStrip("C", "source signal", "compare"),
-          "</div>",
-          "</div>",
           '<aside class="case-panel">',
           '<div class="case-panel-header">',
+          '<div class="panel-heading">',
+          '<img class="panel-icon" src="/icons/sus-chatgpt-icon-128.png" alt="" width="48" height="48" decoding="async" loading="eager" />',
+          "<div>",
           '<p class="eyebrow">New session</p>',
           "<h2>Choose a case file</h2>",
+          "</div>",
+          "</div>",
           '<p class="message">' + html(message) + "</p>",
           showError ? '<p class="error" role="alert">' + html(state.error || game.message) + "</p>" : "",
           "</div>",
@@ -1102,11 +1076,8 @@ export const SUS_WIDGET_HTML = `
           '<button data-action="start-topic" type="submit"' +
             (state.busy ? " disabled" : "") +
             ">" +
-            html(state.busy || "Start round") +
+            html(state.busy || "Open case file") +
             "</button>",
-          '<button class="secondary" data-action="fresh-session" type="button"' +
-            (state.busy ? " disabled" : "") +
-            ">Fresh session</button>",
           "</div>",
           "</form>",
           suggestions.length
@@ -1123,12 +1094,25 @@ export const SUS_WIDGET_HTML = `
                   .join("") +
               "</div></div>"
             : "",
-          '<div class="dossier">',
-          renderDossierRow("Goal", "Find the one claim that quietly overreaches."),
-          renderDossierRow("Move", "Read the cards side-by-side. Accuse only when the wording becomes too certain."),
-          renderDossierRow("State", htmlStatus(status)),
-          "</div>",
           "</aside>",
+          '<div class="hero">',
+          '<div class="hero-content">',
+          '<div class="case-mark"><img src="/icons/sus-app-icon-192.png" alt="" width="72" height="72" decoding="async" loading="eager" /></div>',
+          '<p class="eyebrow">Four truths · one lie</p>',
+          "<h1>Spot the tiny false spin.</h1>",
+          '<p class="lede">Choose any topic. Sus deals five credible source cards; four stay careful, one quietly turns a caveat into certainty.</p>',
+          '<div class="intro-flow" aria-label="How Sus works">',
+          renderIntroStep("1", "Pick a case", "Start from a topic or one of the suggested cases."),
+          renderIntroStep("2", "Compare wording", "Look for absolute claims, missing caveats, weak mechanisms, or broad scope."),
+          renderIntroStep("3", "Accuse one card", "Wrong guesses clear truth and unlock one clue question."),
+          "</div>",
+          "</div>",
+          '<div class="case-stack" aria-hidden="true">',
+          renderFileStrip("A", "careful claim", "verified"),
+          renderFileStrip("B", "missing caveat", "suspect"),
+          renderFileStrip("C", "source signal", "compare"),
+          "</div>",
+          "</div>",
           "</section>"
         ].join("");
       }
@@ -1150,16 +1134,6 @@ export const SUS_WIDGET_HTML = `
           '</span><span class="file-title">' +
           html(title) +
           '</span><span class="file-rule"></span></div>'
-        );
-      }
-
-      function renderDossierRow(label, value) {
-        return (
-          '<div class="dossier-row"><span class="dossier-label">' +
-          html(label) +
-          '</span><span class="dossier-value">' +
-          value +
-          "</span></div>"
         );
       }
 
@@ -1642,9 +1616,6 @@ export const SUS_WIDGET_HTML = `
               state.error = "";
               persistUiState();
               await startTopicRound();
-            }
-            if (action === "fresh-session") {
-              await runTool("start_game", { restart: true }, "Opening");
             }
             if (action === "welcome") {
               await runTool("reset_game", {}, "Resetting");
