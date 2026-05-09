@@ -1,0 +1,29 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 360 512" role="img" aria-labelledby="title desc">
+  <title id="title">Web source card</title>
+  <desc id="desc">A cream source card with a globe symbol, document lines, and a verified badge.</desc>
+  <defs>
+    <linearGradient id="paper" x1="52" x2="310" y1="28" y2="492" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#fffdf8"/>
+      <stop offset="0.56" stop-color="#fff7e8"/>
+      <stop offset="1" stop-color="#f1e5cf"/>
+    </linearGradient>
+    <filter id="shadow" x="-18%" y="-12%" width="136%" height="132%" color-interpolation-filters="sRGB">
+      <feDropShadow dx="0" dy="16" flood-color="#261e13" flood-opacity="0.18" stdDeviation="14"/>
+    </filter>
+  </defs>
+  <rect x="31" y="23" width="298" height="466" rx="38" fill="url(#paper)" filter="url(#shadow)"/>
+  <rect x="31" y="23" width="298" height="466" rx="38" fill="none" stroke="#b7a98e" stroke-width="3"/>
+  <g fill="none" stroke="#514e48" stroke-linecap="round" stroke-linejoin="round" stroke-width="8">
+    <circle cx="180" cy="117" r="61"/>
+    <path d="M119 117h122"/>
+    <path d="M180 56c25 25 38 45 38 61s-13 36-38 61"/>
+    <path d="M180 56c-25 25-38 45-38 61s13 36 38 61"/>
+    <path d="M132 82c27 10 69 10 96 0"/>
+    <path d="M132 152c27-10 69-10 96 0"/>
+  </g>
+  <path d="M99 220h162" stroke="#a09582" stroke-width="15" stroke-linecap="round"/>
+  <path d="M90 274h180" stroke="#a09582" stroke-width="15" stroke-linecap="round"/>
+  <path d="M102 327h156" stroke="#a09582" stroke-width="15" stroke-linecap="round"/>
+  <circle cx="118" cy="400" r="42" fill="#6f8c3f" stroke="#456226" stroke-width="4"/>
+  <path d="M96 397l16 17 31-38" fill="none" stroke="#fffdf8" stroke-linecap="round" stroke-linejoin="round" stroke-width="10"/>
+</svg>

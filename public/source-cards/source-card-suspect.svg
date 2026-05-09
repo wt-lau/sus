@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 360 512" role="img" aria-labelledby="title desc">
+  <title id="title">Suspect source card</title>
+  <desc id="desc">A warm source card with a warning symbol, document lines, and a suspicious status dot.</desc>
+  <defs>
+    <linearGradient id="paper" x1="52" x2="310" y1="28" y2="492" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#fff8e8"/>
+      <stop offset="0.56" stop-color="#ffe5b7"/>
+      <stop offset="1" stop-color="#ffd68f"/>
+    </linearGradient>
+    <filter id="shadow" x="-18%" y="-12%" width="136%" height="132%" color-interpolation-filters="sRGB">
+      <feDropShadow dx="0" dy="16" flood-color="#261e13" flood-opacity="0.2" stdDeviation="14"/>
+    </filter>
+  </defs>
+  <rect x="31" y="23" width="298" height="466" rx="38" fill="url(#paper)" filter="url(#shadow)"/>
+  <rect x="31" y="23" width="298" height="466" rx="38" fill="none" stroke="#c89556" stroke-width="3"/>
+  <path d="M180 61l91 142H89z" fill="#f15a28" stroke="#c7361f" stroke-linejoin="round" stroke-width="5"/>
+  <path d="M180 105v49" stroke="#fffdf8" stroke-linecap="round" stroke-width="18"/>
+  <circle cx="180" cy="181" r="11" fill="#fffdf8"/>
+  <path d="M89 243h181" stroke="#e65c27" stroke-width="15" stroke-linecap="round"/>
+  <path d="M89 294h181" stroke="#e65c27" stroke-width="15" stroke-linecap="round"/>
+  <path d="M89 345h151" stroke="#e65c27" stroke-width="15" stroke-linecap="round"/>
+  <circle cx="118" cy="409" r="42" fill="#f15a28" stroke="#c7361f" stroke-width="4"/>
+</svg>

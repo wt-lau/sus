@@ -44,7 +44,7 @@ type TopicPack = {
 export type Round = {
   id: string;
   topic: string;
-  sourceMode: "starter-pack" | "provided-sources";
+  sourceMode: "starter-pack" | "provided-sources" | "exa";
   sourcePackTopic: string;
   requestedTopic: string | null;
   prompt: string;
@@ -64,7 +64,29 @@ export type GuessRecord = {
 export type QuestionRecord = {
   question: string;
   answer: string;
+  answerSource?: "local-hints" | "exa-answer" | "exa-answer-fallback";
+  citations?: Array<{
+    title: string;
+    url: string;
+    published?: string;
+  }>;
   askedAt: string;
+};
+
+export type GeneratedImageAsset = {
+  id: string;
+  type: "image";
+  url: string;
+  mimeType: "image/jpeg";
+  model: string;
+  prompt: string;
+  seed: number;
+  generatedAt: string;
+};
+
+export type GameAssets = {
+  image: GeneratedImageAsset | null;
+  imageError: string | null;
 };
 
 export type GameState = {
@@ -72,12 +94,13 @@ export type GameState = {
     id: string;
     startedAt: string;
   } | null;
-  status: "idle" | "active" | "won" | "revealed";
+  status: "idle" | "welcome" | "active" | "won" | "revealed" | "quit";
   round: Round | null;
   eliminatedIds: CardId[];
   pendingQuestion: boolean;
   guesses: GuessRecord[];
   questions: QuestionRecord[];
+  assets: GameAssets;
   score: {
     roundsStarted: number;
     wins: number;
@@ -526,6 +549,10 @@ export function createInitialGameState(): GameState {
     pendingQuestion: false,
     guesses: [],
     questions: [],
+    assets: {
+      image: null,
+      imageError: null
+    },
     score: {
       roundsStarted: 0,
       wins: 0,
@@ -546,10 +573,16 @@ export function normalizeCardId(value: string): CardId | undefined {
   return CARD_IDS.find((id) => id === normalized);
 }
 
-export function createRound(topic?: string, sourceSeeds?: SourceSeed[]): Round {
+export function createRound(
+  topic?: string,
+  sourceSeeds?: SourceSeed[],
+  sourceModeOverride?: "provided-sources" | "exa"
+): Round {
   const requestedTopic = topic?.trim() || null;
   const providedCards = createCardsFromSourceSeeds(requestedTopic, sourceSeeds);
-  const sourceMode = providedCards ? "provided-sources" : "starter-pack";
+  const sourceMode = providedCards
+    ? (sourceModeOverride ?? "provided-sources")
+    : "starter-pack";
   const pack = findTopicPack(requestedTopic) ?? TOPIC_PACKS[0];
   const topicLabel = providedCards
     ? (requestedTopic ?? "Custom source pack")
@@ -570,20 +603,21 @@ export function createRound(topic?: string, sourceSeeds?: SourceSeed[]): Round {
     topic: topicLabel,
     sourceMode,
     sourcePackTopic:
-      sourceMode === "provided-sources" ? "provided sources" : pack.topic,
+      sourceMode === "exa"
+        ? "Exa search"
+        : sourceMode === "provided-sources"
+          ? "provided sources"
+          : pack.topic,
     requestedTopic,
-    prompt:
-      sourceMode === "provided-sources"
-        ? `Five cards discuss ${requestedTopic ?? "the selected topic"}. Four preserve the source claim; one adds a minor spin that makes it false.`
-        : pack.prompt,
-    artPrompt:
-      sourceMode === "provided-sources"
-        ? "Editorial source-checking board with five evidence cards, one subtly distorted by a red herring annotation."
-        : pack.artPrompt,
-    clipPrompt:
-      sourceMode === "provided-sources"
-        ? "Short reveal animation: five evidence cards shuffle, truthful cards stamp verified, and the spun card peels back."
-        : pack.clipPrompt,
+    prompt: providedCards
+      ? `Five cards discuss ${requestedTopic ?? "the selected topic"}. Four preserve the source claim; one adds a minor spin that makes it false.`
+      : pack.prompt,
+    artPrompt: providedCards
+      ? "Editorial source-checking board with five evidence cards, one subtly distorted by a red herring annotation."
+      : pack.artPrompt,
+    clipPrompt: providedCards
+      ? "Short reveal animation: five evidence cards shuffle, truthful cards stamp verified, and the spun card peels back."
+      : pack.clipPrompt,
     cards,
     lieId: lie.id
   };
@@ -598,6 +632,7 @@ export function toPublicRound(round: Round, state: GameState) {
     getRemainingCards(round, state.eliminatedIds).map((card) => card.id)
   );
   const isComplete = state.status === "won" || state.status === "revealed";
+  const assets = state.assets ?? createInitialGameState().assets;
 
   return {
     id: round.id,
@@ -607,29 +642,41 @@ export function toPublicRound(round: Round, state: GameState) {
     prompt: round.prompt,
     sourceMode: round.sourceMode,
     starterMode: round.sourceMode === "starter-pack",
+    assets,
     futureAssets: {
       artPrompt: round.artPrompt,
       clipPrompt: round.clipPrompt,
-      imageUrl: null,
+      imageUrl: assets.image?.url ?? null,
       clipUrl: null
     },
     pendingQuestion: state.pendingQuestion,
-    cards: round.cards.map((card) => ({
-      id: card.id,
-      sourceName: card.sourceName,
-      sourceType: card.sourceType,
-      headline: card.headline,
-      claim: card.claim,
-      excerpt: card.excerpt,
-      published: card.published,
-      credibilitySignal: card.credibilitySignal,
-      url: card.url,
-      status: isComplete
+    cards: round.cards.map((card) => {
+      const isRemaining = remainingIds.has(card.id);
+      const status = isComplete
         ? card.verdict
-        : remainingIds.has(card.id)
+        : isRemaining
           ? "remaining"
-          : "cleared"
-    }))
+          : "cleared";
+
+      return {
+        id: card.id,
+        sourceName: card.sourceName,
+        sourceType: card.sourceType,
+        headline: card.headline,
+        claim: card.claim,
+        excerpt: card.excerpt,
+        published: card.published,
+        credibilitySignal: card.credibilitySignal,
+        url: card.url,
+        status,
+        ...(isComplete || !isRemaining
+          ? {
+              verdict: card.verdict,
+              explanation: card.explanation
+            }
+          : {})
+      };
+    })
   };
 }
 
@@ -671,6 +718,12 @@ export function answerQuestion(
     question,
     summary,
     clues,
+    source: "local-hints" as const,
+    citations: [] as Array<{
+      title: string;
+      url: string;
+      published?: string;
+    }>,
     remainingCardIds: remainingCards.map((card) => card.id)
   };
 }
@@ -783,7 +836,7 @@ function createSpunLie(
       "The source shape looks plausible, but the wording turns bounded evidence into an absolute claim.",
     url: sourceSeed.url,
     verdict: "lie",
-    explanation: `This is the lie: it adds a minor but material spin to ${sourceSeed.sourceName}, overstating what the source supports about ${topicLabel}.`,
+    explanation: `This is the lie: Sus ${spin.description} in a card derived from ${sourceSeed.sourceName}, overstating what the source supports about ${topicLabel}. The original claim was: "${truncateText(sourceSeed.claim, 220)}"`,
     questionHints: [
       "The suspicious move is the jump from bounded evidence to absolute language.",
       "Compare the card's certainty against the source-style caveats in the other cards."
@@ -804,16 +857,20 @@ function applyMinorSpin(claim: string) {
   ];
 
   for (const [pattern, replacement] of replacements) {
-    if (pattern.test(claim)) {
+    const match = claim.match(pattern);
+    if (match) {
       return {
-        claim: claim.replace(pattern, replacement)
+        claim: claim.replace(pattern, replacement),
+        description: `changed "${match[0]}" to "${replacement}"`
       };
     }
   }
 
   const trimmedClaim = claim.trim();
   return {
-    claim: `${trimmedClaim.replace(/[.!?]$/, "")} in every case, without meaningful exceptions.`
+    claim: `${trimmedClaim.replace(/[.!?]$/, "")} in every case, without meaningful exceptions.`,
+    description:
+      'removed the claim limits and added "in every case, without meaningful exceptions"'
   };
 }
 
@@ -827,6 +884,13 @@ function addSpinToHeadline(headline: string) {
   }
 
   return `${headline}: no exceptions found`;
+}
+
+function truncateText(value: string, maxLength: number) {
+  const normalized = value.replace(/\s+/g, " ").trim();
+  if (normalized.length <= maxLength) return normalized;
+
+  return `${normalized.slice(0, maxLength - 1).trimEnd()}...`;
 }
 
 function normalizeTopic(topic: string) {

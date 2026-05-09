@@ -1,0 +1,28 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 360 512" role="img" aria-labelledby="title desc">
+  <title id="title">Data source card</title>
+  <desc id="desc">A cream source card with a bar chart symbol, document lines, and a verified badge.</desc>
+  <defs>
+    <linearGradient id="paper" x1="52" x2="310" y1="28" y2="492" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#fffdf8"/>
+      <stop offset="0.56" stop-color="#fff7e8"/>
+      <stop offset="1" stop-color="#f1e5cf"/>
+    </linearGradient>
+    <filter id="shadow" x="-18%" y="-12%" width="136%" height="132%" color-interpolation-filters="sRGB">
+      <feDropShadow dx="0" dy="16" flood-color="#261e13" flood-opacity="0.18" stdDeviation="14"/>
+    </filter>
+  </defs>
+  <rect x="31" y="23" width="298" height="466" rx="38" fill="url(#paper)" filter="url(#shadow)"/>
+  <rect x="31" y="23" width="298" height="466" rx="38" fill="none" stroke="#b7a98e" stroke-width="3"/>
+  <path d="M113 198h130" stroke="#a09582" stroke-width="15" stroke-linecap="round"/>
+  <path d="M101 250h158" stroke="#a09582" stroke-width="15" stroke-linecap="round"/>
+  <path d="M91 303h178" stroke="#a09582" stroke-width="15" stroke-linecap="round"/>
+  <g fill="none" stroke="#514e48" stroke-linecap="round" stroke-linejoin="round" stroke-width="12">
+    <path d="M101 157h129"/>
+    <path d="M119 157V99"/>
+    <path d="M164 157v-91"/>
+    <path d="M209 157v-121"/>
+    <path d="M95 169l142-13"/>
+  </g>
+  <circle cx="118" cy="400" r="42" fill="#6f8c3f" stroke="#456226" stroke-width="4"/>
+  <path d="M96 397l16 17 31-38" fill="none" stroke="#fffdf8" stroke-linecap="round" stroke-linejoin="round" stroke-width="10"/>
+</svg>

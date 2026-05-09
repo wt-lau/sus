@@ -39,3 +39,9 @@ If the application uses Durable Objects or Workflows, refer to the relevant best
 
 - Durable Objects: https://developers.cloudflare.com/durable-objects/best-practices/rules-of-durable-objects/
 - Workflows: https://developers.cloudflare.com/workflows/build/rules-of-workflows/
+
+
+# Coding
+
+Do not remove work unnecessarily as it might have been done by another agent. Clarify with the developer before deleting.
+Do not run dev server, assumes it is running.

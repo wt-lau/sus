@@ -21,6 +21,10 @@
       }
     ]
   },
+  "ai": {
+    "binding": "AI",
+    "remote": true
+  },
   "migrations": [
     {
       "new_sqlite_classes": ["SusGameMcp"],

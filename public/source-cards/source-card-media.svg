@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 360 512" role="img" aria-labelledby="title desc">
+  <title id="title">Media source card</title>
+  <desc id="desc">A cream source card with an image symbol, document lines, and a verified badge.</desc>
+  <defs>
+    <linearGradient id="paper" x1="52" x2="310" y1="28" y2="492" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#fffdf8"/>
+      <stop offset="0.56" stop-color="#fff7e8"/>
+      <stop offset="1" stop-color="#f1e5cf"/>
+    </linearGradient>
+    <filter id="shadow" x="-18%" y="-12%" width="136%" height="132%" color-interpolation-filters="sRGB">
+      <feDropShadow dx="0" dy="16" flood-color="#261e13" flood-opacity="0.18" stdDeviation="14"/>
+    </filter>
+  </defs>
+  <rect x="31" y="23" width="298" height="466" rx="38" fill="url(#paper)" filter="url(#shadow)"/>
+  <rect x="31" y="23" width="298" height="466" rx="38" fill="none" stroke="#b7a98e" stroke-width="3"/>
+  <path d="M99 176l64-74 43 51 27-31 52 54z" fill="#656058" stroke="#423f3b" stroke-linejoin="round" stroke-width="5"/>
+  <circle cx="240" cy="84" r="28" fill="#656058" stroke="#423f3b" stroke-width="5"/>
+  <path d="M98 226h164" stroke="#a09582" stroke-width="15" stroke-linecap="round"/>
+  <path d="M98 279h164" stroke="#a09582" stroke-width="15" stroke-linecap="round"/>
+  <path d="M98 332h164" stroke="#a09582" stroke-width="15" stroke-linecap="round"/>
+  <circle cx="118" cy="400" r="42" fill="#6f8c3f" stroke="#456226" stroke-width="4"/>
+  <path d="M96 397l16 17 31-38" fill="none" stroke="#fffdf8" stroke-linecap="round" stroke-linejoin="round" stroke-width="10"/>
+</svg>

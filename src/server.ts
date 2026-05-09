@@ -2,8 +2,11 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { McpAgent } from "agents/mcp";
 import { z } from "zod";
 import {
+  ExaAnswerError,
   ExaSourceSearchError,
+  answerQuestionWithExa,
   searchTopicSourcesWithExa,
+  type ExaAnswerCitation,
   type ExaSourceSearch
 } from "./exa";
 import {
@@ -15,7 +18,10 @@ import {
   normalizeCardId,
   revealRound,
   toPublicRound,
-  type GameState
+  type CardId,
+  type GeneratedImageAsset,
+  type GameState,
+  type Round
 } from "./game";
 import {
   SUS_WIDGET_HTML,
@@ -24,6 +30,24 @@ import {
 } from "./widget";
 
 const gameViewOutputSchema = z.object({}).passthrough();
+const WORKERS_AI_IMAGE_MODEL = "@cf/black-forest-labs/flux-1-schnell";
+const susWidgetResourceMeta = {
+  ui: {
+    prefersBorder: true,
+    csp: {
+      connectDomains: [],
+      resourceDomains: []
+    }
+  },
+  "openai/widgetDescription":
+    "Interactive Sus game board for choosing a topic, comparing five source cards, accusing the false spin, asking earned clue questions, and reviewing the reveal.",
+  "openai/widgetPrefersBorder": true,
+  "openai/widgetCSP": {
+    connect_domains: [],
+    resource_domains: []
+  }
+};
+
 const sourceSeedSchema = z.object({
   sourceName: z.string().min(1).max(120),
   sourceType: z.string().min(1).max(120),
@@ -86,6 +110,21 @@ function noRoundResponse() {
   });
 }
 
+function welcomeResponse(state: GameState, prefillTopic?: string) {
+  return jsonResponse({
+    status: "welcome",
+    message: "Sus is ready. Enter a topic to open a new case file.",
+    session: state.session,
+    score: state.score,
+    prefillTopic: prefillTopic?.trim() || "",
+    suggestedTopics: listTopics(),
+    nextActions: [
+      "Enter a topic in the widget.",
+      "Or call start_round with a topic."
+    ]
+  });
+}
+
 function createSession() {
   return {
     id: crypto.randomUUID(),
@@ -139,7 +178,7 @@ async function prepareRound(
   const sourceSearch = await searchTopicSourcesWithExa(requestedTopic, apiKey);
 
   return {
-    round: createRound(requestedTopic, sourceSearch.sources),
+    round: createRound(requestedTopic, sourceSearch.sources, "exa"),
     sourceSearch: exaSearchMeta(sourceSearch)
   };
 }
@@ -172,6 +211,132 @@ function exaErrorResponse(error: unknown, topic?: string) {
   throw error;
 }
 
+async function answerRoundQuestion(
+  round: Round,
+  question: string,
+  eliminatedIds: CardId[],
+  apiKey: string | undefined
+) {
+  const localAnswer = answerQuestion(round, question, eliminatedIds);
+  const remainingCards = getRemainingCards(round, eliminatedIds);
+
+  if (!apiKey?.trim()) {
+    return localAnswer;
+  }
+
+  try {
+    const exaAnswer = await answerQuestionWithExa(
+      {
+        topic: round.requestedTopic ?? round.topic,
+        question,
+        remainingCards
+      },
+      apiKey
+    );
+
+    return {
+      ...localAnswer,
+      summary: exaAnswer.answer,
+      source: "exa-answer" as const,
+      citations: exaAnswer.citations,
+      exa: {
+        query: exaAnswer.query,
+        citationCount: exaAnswer.citations.length
+      }
+    };
+  } catch (error) {
+    return {
+      ...localAnswer,
+      source: "exa-answer-fallback" as const,
+      exa: exaAnswerErrorMeta(error)
+    };
+  }
+}
+
+function exaAnswerErrorMeta(error: unknown) {
+  if (error instanceof ExaAnswerError) {
+    return {
+      status: error.status,
+      details: error.details,
+      message: error.message
+    };
+  }
+
+  return {
+    message: error instanceof Error ? error.message : "Unknown Exa Answer error"
+  };
+}
+
+function questionCitationRecords(citations?: ExaAnswerCitation[]) {
+  return citations?.slice(0, 5).map((citation) => ({
+    title: citation.title,
+    url: citation.url,
+    published: citation.published
+  }));
+}
+
+function normalizeAssetPrompt(value: string) {
+  return value.replace(/\s+/g, " ").trim().slice(0, 2048);
+}
+
+function buildRoundImagePrompt(
+  round: Round,
+  state: GameState,
+  customPrompt?: string
+) {
+  const remainingCards = getRemainingCards(round, state.eliminatedIds);
+  return normalizeAssetPrompt(
+    [
+      "Create a custom illustration for Sus, a source-checking game where five credible source cards hide one subtle false spin.",
+      `Topic: ${round.topic}.`,
+      `Round direction: ${customPrompt?.trim() || round.artPrompt}.`,
+      `Current state: ${state.status}; ${remainingCards.length} suspect cards remain.`,
+      "Show an investigative tabletop board with five paper source cards, evidence marks, and one visually suspicious card.",
+      "Do not include readable body text, real logos, public figures, or photorealistic documents."
+    ].join(" ")
+  );
+}
+
+type WorkersAiImageResponse = {
+  image?: string;
+};
+
+async function generateRoundImageAsset(
+  round: Round,
+  state: GameState,
+  env: Env,
+  customPrompt?: string
+): Promise<GeneratedImageAsset> {
+  const prompt = buildRoundImagePrompt(round, state, customPrompt);
+  const seed = Math.floor(Math.random() * 1_000_000_000);
+  const result = (await env.AI.run(WORKERS_AI_IMAGE_MODEL, {
+    prompt,
+    seed,
+    steps: 4
+  })) as WorkersAiImageResponse;
+
+  if (!result.image) {
+    throw new Error("Workers AI did not return an image payload.");
+  }
+
+  return {
+    id: crypto.randomUUID(),
+    type: "image",
+    url: `data:image/jpeg;charset=utf-8;base64,${result.image}`,
+    mimeType: "image/jpeg",
+    model: WORKERS_AI_IMAGE_MODEL,
+    prompt,
+    seed,
+    generatedAt: new Date().toISOString()
+  };
+}
+
+function assetErrorMessage(error: unknown) {
+  return error instanceof Error
+    ? error.message
+    : "Unknown Workers AI image generation error";
+}
+
 export class SusGameMcp extends McpAgent<
   Env,
   GameState,
@@ -192,15 +357,7 @@ export class SusGameMcp extends McpAgent<
         title: "Sus source cards",
         description: "Interactive HTML UI for the Sus source-card game.",
         mimeType: SUS_WIDGET_MIME_TYPE,
-        _meta: {
-          ui: {
-            prefersBorder: true,
-            csp: {
-              connectDomains: [],
-              resourceDomains: []
-            }
-          }
-        }
+        _meta: susWidgetResourceMeta
       },
       async () => ({
         contents: [
@@ -208,15 +365,7 @@ export class SusGameMcp extends McpAgent<
             uri: SUS_WIDGET_URI,
             mimeType: SUS_WIDGET_MIME_TYPE,
             text: SUS_WIDGET_HTML,
-            _meta: {
-              ui: {
-                prefersBorder: true,
-                csp: {
-                  connectDomains: [],
-                  resourceDomains: []
-                }
-              }
-            }
+            _meta: susWidgetResourceMeta
           }
         ]
       })
@@ -229,7 +378,12 @@ export class SusGameMcp extends McpAgent<
         description: "Explain how to play Sus, the source-checking game.",
         inputSchema: {},
         outputSchema: gameViewOutputSchema,
-        annotations: { readOnlyHint: true, destructiveHint: false },
+        annotations: {
+          readOnlyHint: true,
+          destructiveHint: false,
+          openWorldHint: false,
+          idempotentHint: true
+        },
         _meta: dataToolMeta("Loading rules", "Rules ready")
       },
       async () =>
@@ -237,8 +391,8 @@ export class SusGameMcp extends McpAgent<
           name: "Sus",
           tagline: "Four truths. One lie. Find the sus source.",
           rules: [
-            "Start with start_game. It creates a stateful game session for this MCP client and starts the first round.",
-            "Each round has one topic and five source cards.",
+            "Start with start_game. It creates a stateful game session and renders the welcome screen.",
+            "Choose a topic from the welcome screen, then start_round deals five source cards.",
             "Four cards are truthful. One card is the lie.",
             "Guess the lie with guess_sus_source.",
             "If you pick a truthful card, that card is cleared and you must ask one question before guessing again.",
@@ -257,13 +411,18 @@ export class SusGameMcp extends McpAgent<
         description: "Show the bundled Sus starter topics available locally.",
         inputSchema: {},
         outputSchema: gameViewOutputSchema,
-        annotations: { readOnlyHint: true, destructiveHint: false },
+        annotations: {
+          readOnlyHint: true,
+          destructiveHint: false,
+          openWorldHint: false,
+          idempotentHint: true
+        },
         _meta: dataToolMeta("Loading topics", "Topics ready")
       },
       async () =>
         jsonResponse({
           topics: listTopics(),
-          note: "Pass any topic to start_game or start_round to search Exa. Calling either tool without a topic uses the bundled starter pack."
+          note: "Use these as suggested welcome topics, or pass any topic to start_round to search Exa. Calling start_round without a topic is reserved for local starter-pack demos."
         })
     );
 
@@ -272,21 +431,22 @@ export class SusGameMcp extends McpAgent<
       {
         title: "Start Sus game",
         description:
-          "Use this when the user asks ChatGPT to create a Sus session. Start a stateful game and deal five source cards for the requested topic.",
+          "Use this when the user asks ChatGPT to create a Sus session. Start a stateful game and render the welcome UI where the user chooses a topic. Do not deal source cards from this tool.",
         inputSchema: {
           topic: z
             .string()
             .min(1)
             .max(80)
             .optional()
-            .describe("Optional starter topic, for example 'Ocean plastic'."),
+            .describe(
+              "Optional topic to prefill in the welcome screen. This does not start a round."
+            ),
           restart: z
             .boolean()
             .optional()
             .describe(
               "Set true to abandon the active session and start a fresh game."
-            ),
-          sources: sourcesInputSchema
+            )
         },
         outputSchema: gameViewOutputSchema,
         annotations: {
@@ -295,9 +455,9 @@ export class SusGameMcp extends McpAgent<
           idempotentHint: false,
           openWorldHint: false
         },
-        _meta: widgetToolMeta("Dealing sources", "Source cards ready")
+        _meta: widgetToolMeta("Opening Sus", "Sus ready")
       },
-      async ({ restart, topic, sources }) => {
+      async ({ restart, topic }) => {
         if (
           this.state.session &&
           this.state.round &&
@@ -317,14 +477,6 @@ export class SusGameMcp extends McpAgent<
           });
         }
 
-        let preparedRound: RoundPreparation;
-        try {
-          preparedRound = await prepareRound(topic, sources, this.env);
-        } catch (error) {
-          return exaErrorResponse(error, topic);
-        }
-
-        const { round, sourceSearch } = preparedRound;
         const freshSession = restart === true || !this.state.session;
         const session = freshSession ? createSession() : this.state.session;
         const previousScore = freshSession
@@ -333,33 +485,13 @@ export class SusGameMcp extends McpAgent<
         const nextState: GameState = {
           ...createInitialGameState(),
           session,
-          status: "active",
-          round,
-          score: {
-            ...previousScore,
-            roundsStarted: previousScore.roundsStarted + 1
-          }
+          status: "welcome",
+          score: previousScore
         };
 
         this.setState(nextState);
 
-        return jsonResponse({
-          status: freshSession ? "started" : "round-started",
-          message: freshSession
-            ? `Game started. First round: ${round.topic}`
-            : `Round started in the current game session: ${round.topic}`,
-          session,
-          stateful: {
-            host: "Cloudflare McpAgent session",
-            note: "This MCP client keeps the game state across subsequent tool calls."
-          },
-          round: toPublicRound(round, nextState),
-          sourceSearch,
-          nextActions: [
-            "Review the five cards.",
-            "Call guess_sus_source with the card ID you think is lying."
-          ]
-        });
+        return welcomeResponse(nextState, topic);
       }
     );
 
@@ -381,6 +513,10 @@ export class SusGameMcp extends McpAgent<
       },
       async () => {
         if (!this.state.round) {
+          if (this.state.session && this.state.status === "welcome") {
+            return welcomeResponse(this.state);
+          }
+
           return jsonResponse({
             status: "idle",
             message: "No game is active. Start a session from the widget.",
@@ -425,7 +561,7 @@ export class SusGameMcp extends McpAgent<
           readOnlyHint: false,
           destructiveHint: false,
           idempotentHint: false,
-          openWorldHint: false
+          openWorldHint: true
         },
         _meta: widgetToolMeta("Dealing round", "Round ready")
       },
@@ -455,6 +591,7 @@ export class SusGameMcp extends McpAgent<
         this.setState(nextState);
 
         return jsonResponse({
+          status: "active",
           message: `Round started: ${round.topic}`,
           session,
           round: toPublicRound(round, nextState),
@@ -468,6 +605,100 @@ export class SusGameMcp extends McpAgent<
     );
 
     this.server.registerTool(
+      "generate_round_asset",
+      {
+        title: "Generate round asset",
+        description:
+          "Generate a custom Workers AI image for the active Sus round from the current game state and visual prompt.",
+        inputSchema: {
+          prompt: z
+            .string()
+            .min(1)
+            .max(700)
+            .optional()
+            .describe(
+              "Optional visual direction to blend with the active round state."
+            ),
+          force: z
+            .boolean()
+            .optional()
+            .describe("Set true to regenerate even when an image exists.")
+        },
+        outputSchema: gameViewOutputSchema,
+        annotations: {
+          readOnlyHint: false,
+          destructiveHint: false,
+          idempotentHint: false,
+          openWorldHint: true
+        },
+        _meta: widgetToolMeta("Generating asset", "Asset ready")
+      },
+      async ({ prompt, force }) => {
+        const round = this.state.round;
+        if (!round) return noRoundResponse();
+
+        const currentAssets =
+          this.state.assets ?? createInitialGameState().assets;
+        if (currentAssets.image && force !== true) {
+          return jsonResponse({
+            status: "asset-ready",
+            message: "Round image already exists.",
+            session: this.state.session,
+            round: toPublicRound(round, this.state),
+            asset: currentAssets.image,
+            nextActions: ["Use force true to regenerate the round image."]
+          });
+        }
+
+        try {
+          const image = await generateRoundImageAsset(
+            round,
+            this.state,
+            this.env,
+            prompt
+          );
+          const nextState: GameState = {
+            ...this.state,
+            assets: {
+              image,
+              imageError: null
+            }
+          };
+          this.setState(nextState);
+
+          return jsonResponse({
+            status: "asset-generated",
+            message: "Workers AI generated a custom image for this round.",
+            session: nextState.session,
+            round: toPublicRound(round, nextState),
+            asset: image,
+            nextActions: ["Review the source cards.", "Guess the sus source."]
+          });
+        } catch (error) {
+          const nextState: GameState = {
+            ...this.state,
+            assets: {
+              ...currentAssets,
+              imageError: assetErrorMessage(error)
+            }
+          };
+          this.setState(nextState);
+
+          return jsonResponse({
+            status: "asset-generation-failed",
+            message: nextState.assets.imageError,
+            session: nextState.session,
+            round: toPublicRound(round, nextState),
+            nextActions: [
+              "Retry generate_round_asset.",
+              "Continue playing without generated art."
+            ]
+          });
+        }
+      }
+    );
+
+    this.server.registerTool(
       "get_round",
       {
         title: "Get current round",
@@ -475,7 +706,12 @@ export class SusGameMcp extends McpAgent<
           "Show the active round, remaining cards, guesses, and whether a question is required.",
         inputSchema: {},
         outputSchema: gameViewOutputSchema,
-        annotations: { readOnlyHint: true, destructiveHint: false },
+        annotations: {
+          readOnlyHint: true,
+          destructiveHint: false,
+          openWorldHint: false,
+          idempotentHint: true
+        },
         _meta: dataToolMeta("Loading round", "Round loaded")
       },
       async () => {
@@ -525,6 +761,7 @@ export class SusGameMcp extends McpAgent<
           return jsonResponse({
             status: this.state.status,
             message: "This round is already complete.",
+            round: toPublicRound(round, this.state),
             reveal: revealRound(round, this.state)
           });
         }
@@ -534,6 +771,7 @@ export class SusGameMcp extends McpAgent<
             status: "question-required",
             message:
               "You cleared a truthful source on the previous guess. Ask one question before guessing again.",
+            round: toPublicRound(round, this.state),
             nextActions: ["ask_question"]
           });
         }
@@ -547,6 +785,7 @@ export class SusGameMcp extends McpAgent<
           return jsonResponse({
             status: "invalid-card",
             message: `Card '${cardId}' is not in this round.`,
+            round: toPublicRound(round, this.state),
             validCardIds: round.cards.map((candidate) => candidate.id)
           });
         }
@@ -582,8 +821,14 @@ export class SusGameMcp extends McpAgent<
           return jsonResponse({
             status: "won",
             message: `Correct. Card ${card.id} is the sus source.`,
+            session: nextState.session,
+            round: toPublicRound(round, nextState),
             reveal: revealRound(round, nextState),
-            nextActions: ["start_round"]
+            score: nextState.score,
+            nextActions: [
+              "Review the summary.",
+              "Use Play again to start another round."
+            ]
           });
         }
 
@@ -610,8 +855,14 @@ export class SusGameMcp extends McpAgent<
             status: "won",
             message:
               "That source checks out. It was the last truthful card, so the remaining card is the sus source.",
+            session: nextState.session,
+            round: toPublicRound(round, nextState),
             reveal: revealRound(round, nextState),
-            nextActions: ["start_round"]
+            score: nextState.score,
+            nextActions: [
+              "Review the summary.",
+              "Use Play again to start another round."
+            ]
           });
         }
 
@@ -647,7 +898,7 @@ export class SusGameMcp extends McpAgent<
           readOnlyHint: false,
           destructiveHint: false,
           idempotentHint: false,
-          openWorldHint: false
+          openWorldHint: true
         },
         _meta: dataToolMeta("Answering question", "Question answered")
       },
@@ -659,6 +910,7 @@ export class SusGameMcp extends McpAgent<
           return jsonResponse({
             status: this.state.status,
             message: "This round is already complete.",
+            round: toPublicRound(round, this.state),
             reveal: revealRound(round, this.state)
           });
         }
@@ -668,14 +920,16 @@ export class SusGameMcp extends McpAgent<
             status: "no-question-earned",
             message:
               "Questions unlock only after you guess a truthful source. Make a guess first.",
+            round: toPublicRound(round, this.state),
             nextActions: ["guess_sus_source"]
           });
         }
 
-        const answer = answerQuestion(
+        const answer = await answerRoundQuestion(
           round,
           question,
-          this.state.eliminatedIds
+          this.state.eliminatedIds,
+          this.env.EXA_API_KEY
         );
         const nextState: GameState = {
           ...this.state,
@@ -685,6 +939,8 @@ export class SusGameMcp extends McpAgent<
             {
               question,
               answer: answer.summary,
+              answerSource: answer.source,
+              citations: questionCitationRecords(answer.citations),
               askedAt: new Date().toISOString()
             }
           ]
@@ -729,8 +985,17 @@ export class SusGameMcp extends McpAgent<
         return jsonResponse({
           status: nextState.status,
           session: nextState.session,
+          round: toPublicRound(round, nextState),
+          message:
+            nextState.status === "won"
+              ? "Case solved. The source board is revealed."
+              : "Round revealed. Review the false spin before starting another case.",
           reveal: revealRound(round, nextState),
-          nextActions: ["start_round"]
+          score: nextState.score,
+          nextActions: [
+            "Review the summary.",
+            "Use Play again to start another round."
+          ]
         });
       }
     );
@@ -764,15 +1029,20 @@ export class SusGameMcp extends McpAgent<
         if (!clearScore) {
           nextState.session = previousSession;
           nextState.score = previousScore;
+          if (previousSession) nextState.status = "welcome";
         }
         this.setState(nextState);
 
         return jsonResponse({
-          status: "idle",
+          status: nextState.status,
+          message: nextState.session
+            ? "Returned to the welcome screen."
+            : "Sus has been reset.",
           session: nextState.session,
           score: nextState.score,
+          suggestedTopics: listTopics(),
           nextActions: nextState.session
-            ? ["list_topics", "start_round"]
+            ? ["Enter a topic in the widget.", "Or call start_round."]
             : ["list_topics", "start_game"]
         });
       }

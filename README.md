@@ -49,7 +49,12 @@ answer.
 This first hackathon pass is a public remote MCP server on Cloudflare Workers
 using `McpAgent`.
 
-It supports three round modes:
+`start_game` now opens the rendered welcome screen first. The user picks a
+topic in the widget, and only then does `start_round` deal the five-card board.
+That keeps the ChatGPT entry point aligned with the MVP loop instead of dumping
+the bundled sample round immediately.
+
+The round engine supports three modes:
 
 - Topic round: pass a topic and Sus searches Exa server-side for five source
   cards.
@@ -58,6 +63,12 @@ It supports three round modes:
 
 The active session keeps score, cleared cards, clue questions, and reveal state
 across MCP tool calls.
+When a player earns a question, `ask_question` uses Exa Answer when
+`EXA_API_KEY` is configured and falls back to the source-card evidence if Exa is
+unavailable.
+Each active round can also generate one custom case image through Workers AI.
+The image prompt is derived from the round topic, current state, and optional
+visual direction from the widget, then returned as a session-scoped data URI.
 
 ## Local MCP
 
@@ -83,18 +94,18 @@ Connect the inspector to `http://localhost:8787/mcp`, then call:
 
 1. `get_rules`
 2. `list_topics`
-3. `start_game`
-4. `render_source_cards`
+3. `start_game` to render the welcome UI
+4. Enter a topic in the widget, or call `start_round` with a topic
 5. `guess_sus_source`
 6. `ask_question` when a truthful card is cleared
 7. `reveal_round` if you want to expose the answer
 
 ## Judge Demo Script
 
-For a quick demo, start with no topic so the bundled cards appear immediately:
+For a quick demo, start with the welcome flow:
 
 1. Call `start_game`.
-2. Call `render_source_cards`.
+2. Use the widget topic input, or call `start_round` with `Ocean plastic`.
 3. Select the card that sounds too absolute.
 4. If the guess is wrong, ask: `What wording should I compare next?`
 5. Guess again, then reveal the round explanation.
@@ -108,11 +119,13 @@ spin for the player to catch.
 
 - `get_rules` - explains the rules and starter-mode behavior.
 - `list_topics` - lists bundled topics available for no-topic local demos.
-- `start_game` - creates a stateful session and deals five cards.
+- `start_game` - creates a stateful session and renders the welcome UI.
 - `render_source_cards` - returns the interactive HTML source-card widget for
   ChatGPT Apps.
 - `start_round` - starts another five-card round inside the current session.
 - `get_round` - shows the current visible game state.
+- `generate_round_asset` - generates or regenerates a Workers AI image for the
+  active round.
 - `guess_sus_source` - selects the card suspected of being the lie.
 - `ask_question` - asks one clue question after clearing a truthful card.
 - `reveal_round` - reveals the answer and every card explanation.
@@ -120,7 +133,7 @@ spin for the player to catch.
 
 ## Source Input Shape
 
-`start_game` and `start_round` can run in three modes:
+`start_round` can run in three modes:
 
 - `topic` and no `sources` - search Exa for source cards.
 - No `topic` and no `sources` - use one of the bundled starter packs.
@@ -156,9 +169,14 @@ Set the deployed Worker secret with Wrangler:
 npx wrangler secret put EXA_API_KEY
 ```
 
+## Workers AI Assets
+
+The Worker has an `AI` binding in `wrangler.jsonc`. `generate_round_asset`
+uses `@cf/black-forest-labs/flux-1-schnell` to create the round image and keeps
+the latest generated data URI in the `McpAgent` state for the current session.
+
 ## Next Integrations
 
-- Exa citation display in the widget.
-- Fal image and clip generation from the selected topic.
 - Cloudflare R2 storage for generated round assets.
+- Clip generation from the selected topic.
 - A polished scoring screen for streaks, fastest solves, and cleanest reads.
